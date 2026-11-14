@@ -12,7 +12,7 @@
   // 🔬 Lab: memory. Flip two cards; matching pairs stay open.
   function lab(el, o) {
     const PAIRS = [['🌙', 'Moon'], ['🔴', 'Mars'], ['☀️', 'Sun'], ['🛰️', 'Satellite'], ['🚀', 'Rocket'], ['🪨', 'Rock sample']];
-    const cards = shuffle(o.rng, PAIRS.flatMap((p, i) => [i, i])); let open = [], found = 0, moves = 0, busy = false;
+    const cards = shuffle(o.rng, PAIRS.flatMap((p, i) => [i, i])); let open = [], found = 0, moves = 0, busy = false, mm = 0;
     el.innerHTML = `<p class="mgq">Moves: <b id="mgmoves">0</b> · Pairs: <b id="mgpairs">0</b>/${PAIRS.length}</p><div class="memo">${cards.map((p, i) =>
       `<button class="mcard" data-i="${i}" aria-label="Card ${i + 1}, face down"><span class="back">?</span><span class="front">${PAIRS[p][0]}<small>${PAIRS[p][1]}</small></span></button>`).join('')}</div>`;
     const btns = [...el.querySelectorAll('.mcard')];
@@ -22,7 +22,8 @@
       if (open.length < 2) return;
       moves += 1; el.querySelector('#mgmoves').textContent = moves; const [a, c] = open; open = [];
       if (cards[a] === cards[c]) { [a, c].forEach(k => btns[k].classList.add('done')); found += 1; el.querySelector('#mgpairs').textContent = found; if (found === PAIRS.length) setTimeout(o.win, 450); }
-      else { busy = true; setTimeout(() => { [a, c].forEach(k => { btns[k].classList.remove('up'); btns[k].setAttribute('aria-label', `Card ${k + 1}, face down`); }); busy = false; }, 850); }
+      // the first few misses are part of the game; more of them lower the star score
+      else { if (++mm > 5) o.miss = (o.miss || 0) + 1; busy = true; setTimeout(() => { [a, c].forEach(k => { btns[k].classList.remove('up'); btns[k].setAttribute('aria-label', `Card ${k + 1}, face down`); }); busy = false; }, 850); }
     });
   }
 
@@ -52,7 +53,7 @@
       if (c === last) return;
       const at = route.indexOf(c); if (at >= 0) { route = route.slice(0, at + 1); draw(); return; } // go back to an earlier square
       if (!near(c, last)) return;
-      if (num[c] && num[c] !== nextNum()) { o.say(`Sample ${nextNum()} comes first!`); return; }
+      if (num[c] && num[c] !== nextNum()) { o.miss = (o.miss || 0) + 1; o.say(`Sample ${nextNum()} comes first!`); return; }
       if (num[c] === LAST && route.length !== ALL - 1) { o.say('Visit every other square before the last sample.'); return; }
       route.push(c); o.tap(); draw(); if (route.length === ALL) setTimeout(o.win, 400); };
     let drag = false; const grid = el.querySelector('.zip');
@@ -93,7 +94,7 @@
       cells.forEach((b, c) => b.classList.toggle('pend', c === pending));
       const covered = boxes.reduce((s, r) => s + area(r), 0); el.querySelector('#mgleft').innerHTML = `Wall covered: <b>${covered}</b>/${W * H} squares`;
       if (covered === W * H && boxes.every(ok)) setTimeout(o.win, 450); };
-    const place = r => { boxes = boxes.filter(q => !overlap(q, r)).concat([r]); o.tap(); if (!ok(r)) o.say('Each box needs exactly ONE number, as big as the box.'); draw(); };
+    const place = r => { boxes = boxes.filter(q => !overlap(q, r)).concat([r]); o.tap(); if (!ok(r)) { o.miss = (o.miss || 0) + 1; o.say('Each box needs exactly ONE number, as big as the box.'); } draw(); };
     grid.addEventListener('pointerdown', e => { const b = cellAt(e, '.pc'); if (!b) return; anchor = +b.dataset.c; try { grid.setPointerCapture(e.pointerId); } catch (x) {} draw(bbox(anchor, anchor)); });
     grid.addEventListener('pointermove', e => { if (anchor === null) return; const b = cellAt(e, '.pc'); if (b) draw(bbox(anchor, +b.dataset.c)); });
     grid.addEventListener('pointerup', e => { if (anchor === null) return; const b = cellAt(e, '.pc'), end = b ? +b.dataset.c : anchor, a = anchor; anchor = null;

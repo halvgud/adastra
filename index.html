@@ -150,6 +150,22 @@
   .big.mg { box-shadow: 0 0 0 3px var(--info); }
   .mg { --cs: clamp(48px, calc((100vw - 70px) / 6), 74px); margin-top: 10px; display: grid; justify-items: center; gap: 8px; }
   .card.mgcard { max-width: 640px; }
+  /* rewards after a puzzle */
+  .burst { position: relative; height: 0; pointer-events: none; }
+  .burst i { position: absolute; left: 50%; top: 40px; width: 8px; height: 8px; opacity: 0; animation: boom .9s ease-out forwards; }
+  @keyframes boom { 0% { opacity: 1; transform: translate(0, 0) rotate(0); } 100% { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--r)); } }
+  h2.cheer { font-size: 1.6rem; text-align: center; color: var(--sun); animation: cheer .6s cubic-bezier(.2, 1.6, .4, 1) both; }
+  @keyframes cheer { 0% { transform: scale(.3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .rate { display: flex; justify-content: center; gap: 10px; margin: 2px 0 4px; }
+  .rate span { font-size: 2.6rem; line-height: 1; color: #3a4252; }
+  .rate span.on { color: var(--sun); animation: starpop .45s cubic-bezier(.2, 1.8, .4, 1) both; text-shadow: 0 0 12px rgba(240,228,66,.7); }
+  @keyframes starpop { 0% { transform: scale(0) rotate(-40deg); } 100% { transform: scale(1) rotate(0); } }
+  .wins { text-align: center; font-weight: 700; } .wins .rec { color: var(--sun); }
+  .mcard.done .front { animation: pop .35s ease-out; } .zc.head { animation: pop .18s ease-out; } .boxes i.good { animation: pop .3s ease-out; }
+  .tip.show { animation: shake .3s; }
+  @keyframes pop { 0% { transform: scale(1); } 45% { transform: scale(1.18); } 100% { transform: scale(1); } }
+  @keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+  @media (prefers-reduced-motion: reduce) { .burst, h2.cheer, .rate span.on, .mcard.done .front, .zc.head, .boxes i.good, .tip.show { animation: none; } }
   .mgq { margin: 4px 0; font-weight: 700; text-align: center; }
   .spec { display: inline-flex; align-items: flex-end; gap: 3px; height: 48px; padding: 4px 6px; background: #000; box-shadow: 0 0 0 2px var(--line); }
   .spec i { display: block; width: 10px; }
