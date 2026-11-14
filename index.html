@@ -169,6 +169,24 @@
   .wins { text-align: center; font-weight: 700; } .wins .rec { color: var(--sun); }
   .mcard.done .front { animation: pop .35s ease-out; } .zc.head { animation: pop .18s ease-out; } .boxes i.good { animation: pop .3s ease-out; }
   .tip.show { animation: shake .3s; }
+  /* 🌱 garden minigame (js/minigames.js → tend): a ring shows how much each plant has grown (and, when ripe, how long until it wilts) */
+  .basket { display: flex; align-items: center; gap: 8px; font-weight: 800; width: calc(var(--cs) * 4 + 18px); max-width: 100%; }
+  .basket .bbar { flex: 1; height: 14px; background: #000; box-shadow: 0 0 0 2px var(--line); } .basket .bbar i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .25s; }
+  .tile.pot { position: relative; background: radial-gradient(circle at 50% 62%, #5a4030 0 42%, #3b2a1e 44%); overflow: visible; }
+  .tile.pot::before { content: ''; position: absolute; inset: 4px; border-radius: 50%; pointer-events: none;
+    background: conic-gradient(var(--ring, #56B4E9) calc(var(--g, 0) * 360deg), rgba(255,255,255,.08) 0);
+    -webkit-mask: radial-gradient(circle, transparent 60%, #000 62%); mask: radial-gradient(circle, transparent 60%, #000 62%); }
+  .tile.pot.ripe { --ring: #3ddc97; animation: none; box-shadow: inset 0 0 0 2px var(--line); } .tile.pot.late { --ring: #D55E00; } .tile.pot.perfect { --ring: #F0E442; box-shadow: inset 0 0 0 3px #F0E442; }
+  .tile.pot .pl { position: relative; display: inline-block; transition: transform .3s; } .tile.pot.tiny .pl { transform: scale(.5) translateY(30%); } .tile.pot.ripe .pl { animation: pop .9s ease-in-out infinite; }
+  .tile.pot .b { position: absolute; font-style: normal; font-size: calc(var(--cs) * .3); display: none; pointer-events: none; line-height: 1; }
+  .tile.pot.dry .thirst { display: block; left: 2px; top: 2px; } .tile.pot.dry .pl { filter: saturate(.4) brightness(.8); }
+  .tile.pot.hasbug .bug { display: block; right: 2px; bottom: 4px; font-size: calc(var(--cs) * .38); animation: wig .25s steps(2) infinite; }
+  .tile.pot.perfect .spark { display: block; right: 2px; top: 2px; }
+  .tile.pot .fly { display: block; left: 50%; top: 10%; transform: translateX(-50%); opacity: 0; font-weight: 900; color: #F0E442; font-size: calc(var(--cs) * .26); text-shadow: 0 1px 0 #000; white-space: nowrap; }
+  .tile.pot .fly.go { animation: flyup .8s ease-out; } .tile.pot.no { animation: shake .25s; }
+  @keyframes flyup { 0% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -26px); } }
+  @keyframes wig { 50% { transform: rotate(14deg) translateX(2px); } }
+  @media (prefers-reduced-motion: reduce) { .tile.pot.ripe .pl, .tile.pot.hasbug .bug, .tile.pot .fly.go, .tile.pot.no { animation: none; } .tile.pot .fly.go { opacity: 1; } }
   @keyframes pop { 0% { transform: scale(1); } 45% { transform: scale(1.18); } 100% { transform: scale(1); } }
   @keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
   @media (prefers-reduced-motion: reduce) { .burst, h2.cheer, .rate span.on, .mcard.done .front, .zc.head, .boxes i.good, .tip.show { animation: none; } }

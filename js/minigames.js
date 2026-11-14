@@ -139,22 +139,50 @@
     draw();
   }
 
-  // 🌱 Greenhouse: lettuces ripen one at a time; pick 5 before they wilt. Tapping a sprout or letting one wilt is a mistake (3 allowed).
+  // 🌱 Greenhouse: 12 pots growing at their own speed. A ring around each pot shows how much it has grown.
+  //   🥬 ripe: tap to pick (+1). ✨ just ripe: pick it now for +2. Left too long, it wilts 🥀 and has to grow again (lost time, not a mistake).
+  //   💧 thirsty: tap to water, or it grows very slowly. 🦠 mold (on the wettest plants): tap to wipe it, or it spoils the plant (a mistake).
+  //   (Mold, not bugs: a sealed space greenhouse has no insects, but damp leaves and still air do grow mold.)
+  //   Tapping a plant that is not ready, with no mold and no thirst, is a mistake too. 5 mistakes allowed. Fill the basket to win.
+  // Mold comes more often as the basket fills. Plants keep ripening the whole time, so it can always be won.
   function tend(el, o) {
-    const R = o.rng, N = 9, GOAL = 5, RIPEN = 1300, WILT = 5500, state = Array(N).fill('sprout'), since = Array(N).fill(0); let picked = 0, over = false; tend.last = 0;
-    el.innerHTML = `<p class="mgq">Picked: <b id="mgpick">0</b>/${GOAL}</p><div class="tiles" style="--cols:3">${Array.from({ length: N }, (_, i) => `<button class="tile soil" data-i="${i}"></button>`).join('')}</div>`;
-    const btns = [...el.querySelectorAll('.tile')];
-    const show = () => btns.forEach((b, i) => { b.textContent = { sprout: '🌱', ripe: '🥬', wilt: '🥀', picked: '🧺' }[state[i]]; b.classList.toggle('ripe', state[i] === 'ripe');
-      b.setAttribute('aria-label', { sprout: 'small sprout', ripe: 'ripe lettuce: pick it!', wilt: 'wilted', picked: 'picked' }[state[i]]); });
+    const R = o.rng, N = 12, GOAL = 12, WILT = 6500, MAXRIPE = 3, PERFECT = 1100, MAXMISS = 5, GROW = () => 1 / (11000 + R() * 7000);
+    const P = Array.from({ length: N }, () => ({ g: R() * 0.45, speed: GROW(), water: 0.45 + R() * 0.55, bug: 0, ripe: 0, wilt: 0, pop: 0 }));
+    let score = 0, over = false, last = performance.now(), nextBug = last + 3500;
+    el.innerHTML = `<div class="basket"><span>🧺</span><div class="bbar"><i id="mgbar"></i></div><b id="mgpick">0</b>/${GOAL}</div>
+      <div class="tiles garden" style="--cols:4">${P.map((_, i) => `<button class="tile pot" data-i="${i}"><span class="pl"></span><i class="b thirst">💧</i><i class="b bug">🦠</i><i class="b spark">✨</i><i class="b fly"></i></button>`).join('')}</div>`;
+    const btns = [...el.querySelectorAll('.pot')], miss = msg => mistakes(o, MAXMISS, msg);
+    const fly = (i, txt) => { const f = btns[i].querySelector('.fly'); f.textContent = txt; f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); };
+    const show = now => btns.forEach((b, i) => { const p = P[i], ripe = p.ripe > 0, perfect = ripe && now - p.ripe < PERFECT, thirsty = p.water < 0.25 && !ripe && !p.wilt;
+      const left = ripe ? 1 - (now - p.ripe) / WILT : 0;
+      b.querySelector('.pl').textContent = p.wilt ? '🥀' : ripe ? '🥬' : p.g < 0.6 ? '🌱' : '🌿'; b.classList.toggle('tiny', !p.wilt && !ripe && p.g < 0.3); // a tiny sprout at first
+      b.style.setProperty('--g', ripe ? left : p.g); b.classList.toggle('ripe', ripe); b.classList.toggle('late', ripe && left < 0.35); b.classList.toggle('dry', thirsty);
+      b.classList.toggle('hasbug', !!p.bug); b.classList.toggle('perfect', perfect);
+      b.setAttribute('aria-label', p.bug ? 'mold on this plant: tap to wipe it' : p.wilt ? 'wilted' : perfect ? 'just ripe: pick it now for 2 points' : ripe ? 'ripe lettuce: pick it' : thirsty ? 'thirsty plant: tap to water' : `growing, ${Math.round(p.g * 100)} %`); });
     const stop = () => { over = true; clearInterval(timer); };
-    const timer = setInterval(() => { if (over || !el.isConnected) return stop(); const now = performance.now();
-      state.forEach((s, i) => { if (s === 'ripe' && now - since[i] > WILT) { state[i] = 'wilt'; since[i] = now; mistakes(o, 3, 'A lettuce wilted!'); } else if (s === 'wilt' && now - since[i] > 1200) state[i] = 'sprout'; });
-      if (now - (tend.last || 0) > RIPEN) { const sp = state.map((s, i) => s === 'sprout' ? i : -1).filter(i => i >= 0); if (sp.length && state.filter(s => s === 'ripe').length < 3) { const i = sp[Math.floor(R() * sp.length)]; state[i] = 'ripe'; since[i] = now; } tend.last = now; }
-      show(); }, 200);
-    btns.forEach((b, i) => b.onclick = () => { if (over) return;
-      if (state[i] === 'ripe') { state[i] = 'picked'; picked += 1; o.tap(); el.querySelector('#mgpick').textContent = picked; show(); setTimeout(() => { if (state[i] === 'picked') state[i] = 'sprout'; }, 900); if (picked >= GOAL) { stop(); setTimeout(o.win, 300); } }
-      else if (state[i] === 'sprout') mistakes(o, 3, 'That sprout is not ready yet!'); });
-    const lose = o.lose; o.lose = m => { stop(); lose(m); }; show();
+    const timer = setInterval(() => { if (over || !el.isConnected) return stop(); const now = performance.now(), dt = now - last; last = now;
+      let ripeNow = P.filter(p => p.ripe).length; // at most MAXRIPE ready at once, so a slow picker is not swamped
+      P.forEach((p, i) => {
+        if (p.wilt) { if (now - p.wilt > 1100) Object.assign(p, { g: 0, wilt: 0, ripe: 0, water: 1 }); return; }
+        if (p.bug && now - p.bug > 3200) { Object.assign(p, { g: 0, bug: 0, ripe: 0 }); miss('Mold spoiled a plant!'); return; }
+        if (p.ripe) { if (now - p.ripe > WILT) { p.wilt = now; p.ripe = 0; o.say('A lettuce wilted. It will grow again!'); } return; } // a lost lettuce, not a mistake
+        // thirsty (💧) below 0.25; it only grows slowly below 0.05
+        p.water = Math.max(0, p.water - dt / 20000); p.g += dt * p.speed * (p.water > 0.05 ? 1 : 0.2) * (p.bug ? 0 : 1);
+        if (p.g >= 1) { if (ripeNow < MAXRIPE) { p.g = 1; p.ripe = now; ripeNow += 1; } else p.g = 0.99; } });
+      if (now > nextBug) { const ok = P.map((p, i) => !p.bug && !p.wilt && p.g > 0.3 ? i : -1).filter(i => i >= 0).sort((a, b) => P[b].water - P[a].water).slice(0, 4); if (ok.length) P[ok[Math.floor(R() * ok.length)]].bug = now; // mold grows on the wettest plants
+        nextBug = now + Math.max(1800, 4200 - score * 230) + R() * 1500; }
+      show(now); }, 100);
+    btns.forEach((b, i) => b.onclick = () => { if (over) return; const p = P[i], now = performance.now();
+      if (p.bug) { p.bug = 0; o.tap(); fly(i, '🧽'); }
+      else if (p.ripe) { const pts = now - p.ripe < PERFECT ? 2 : 1; score += pts; o.tap(); if (pts > 1) o.tap(); fly(i, pts > 1 ? '+2 ✨' : '+1');
+        Object.assign(p, { g: 0, ripe: 0, water: 1, speed: GROW() }); // replanted and watered
+        el.querySelector('#mgpick').textContent = Math.min(score, GOAL); el.querySelector('#mgbar').style.width = Math.min(100, score / GOAL * 100) + '%';
+        if (score >= GOAL) { stop(); setTimeout(o.win, 350); } }
+      else if (p.wilt) return;
+      else if (p.water < 0.25) { p.water = 1; o.tap(); fly(i, '💦'); }
+      else { miss('That one is not ready yet!'); b.classList.remove('no'); void b.offsetWidth; b.classList.add('no'); }
+      show(now); });
+    const lose = o.lose; o.lose = m => { stop(); lose(m); }; show(performance.now());
   }
 
   // 🧽 Mars panels: wipe the dust while the wind keeps blowing some back for a few seconds.

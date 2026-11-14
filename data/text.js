@@ -80,7 +80,7 @@ JAMT_DATA.text = {
       fact: 'The record for the most spacewalks is 16, by cosmonaut Anatoly Solovyev: more than 82 hours outside in space.', src: 'nasa_spacewalk' },
     fix: { title: '🔧 Fix the pipes', how: 'Tap pipe pieces to turn them, until the water can flow from 💧 to 🚰!',
       fact: 'With the water recycler broken, four astronauts would lose about 18 kg of water every day.', src: 'model' },
-    tend: { title: '🌱 Harvest time', how: 'Lettuces 🥬 ripen one by one. Pick 5 of them before they wilt 🥀, and leave the sprouts 🌱 alone!',
+    tend: { title: '🌱 Harvest time', how: 'Fill the basket! Pick ripe lettuces 🥬 (✨ = just ripe, 2 points). Water thirsty plants 💧 and wipe off mold 🦠 before it spoils a plant!',
       fact: 'While it grows, one square meter of lettuce makes about 7.8 grams of oxygen a day.', src: 'model' },
     regolith: { title: '🛡️ Soil bags', how: 'Cover the whole wall with soil bags. Drag (or tap two corners) to make a box. Each box must hold exactly one number, as big as the box.',
       fact: 'About 7 cm of moon soil cuts the dose of a big solar storm to half of NASA’s 30-day limit. That is the yellow “safe” line in your shelter.', src: 'dlr_shielding' },
