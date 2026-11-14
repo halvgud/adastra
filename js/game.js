@@ -171,6 +171,20 @@
   function drawSprite(fr, x, footY, facing, scale) { const s = scale || 1; ctx.save(); ctx.translate(x, footY - 60 * s); if (facing < 0) ctx.scale(-1, 1); ctx.drawImage(fr, -34 * s, 0, 68 * s, 68 * s); ctx.restore(); }
   function text(t, x, y, color, size) { ctx.font = `bold ${size || 12}px ui-monospace, Consolas, monospace`; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.strokeText(t, x, y); ctx.fillStyle = color; ctx.fillText(t, x, y); ctx.textAlign = 'left'; }
 
+  // Small background animations, so the base feels alive. All skipped when the player prefers reduced motion.
+  const STARS = Array.from({ length: 16 }, (_, i) => [(i * 97 + 31) % CW, 6 + (i * 53) % 120, (i * 0.7) % 6.28]);
+  function ambient(t, s, moon, L) {
+    if (moon) STARS.forEach(([x, y, ph]) => { const a = 0.5 + 0.5 * Math.sin(t / 700 + ph); if (a > 0.6) { ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.fillRect(x, y, 1, 1); if (a > 0.95) { ctx.fillRect(x - 1, y, 3, 1); ctx.fillRect(x, y - 1, 1, 3); } } });
+    const orb = (t / 26000) % 1; if (orb < 0.6) { const k = orb / 0.6, x = -10 + k * (CW + 20), y = 22 + Math.sin(k * 3.14) * -10 + 10; ctx.fillStyle = '#dfe7ff'; ctx.fillRect(x | 0, y | 0, 2, 2); ctx.fillStyle = 'rgba(223,231,255,.35)'; ctx.fillRect((x - 4) | 0, y | 0, 3, 1); } // an orbiter passing over
+    if (!moon) { const dd = (t / 18000) % 1; if (dd < 0.5) { const k = dd / 0.5, x = CW + 20 - k * (CW + 60); // a dust devil crossing the plain
+        for (let i = 0; i < 9; i++) { const w = 2 + i * 1.2, sw = Math.sin(t / 120 + i) * w; ctx.fillStyle = `rgba(214,150,96,${0.5 - i * 0.04})`; ctx.fillRect((x + sw) | 0, SKY - 6 - i * 4, Math.max(2, w | 0), 3); } } }
+    if (IMG.panels && L > 0.5) { const g = ((t / 2600) % 1.6) - 0.3; if (g > 0 && g < 1) { ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(250 + g * 120, SKY - 58, 6, 40); } } // sunlight glinting on the panels
+    const [ox, oy] = roomXY(4); if (S.sw.maker) for (let i = 0; i < 6; i++) { const ph = ((t / 1400) + i / 6) % 1; ctx.fillStyle = `rgba(160,220,255,${0.8 - ph * 0.7})`; ctx.fillRect(ox + 52 + (i % 3) * 9 + Math.sin(t / 300 + i) * 2, oy + 66 - ph * 44, 2, 2); } // bubbles in the air maker
+    const [gx, gy] = roomXY(2); if (S.sw.gh) { ctx.fillStyle = `rgba(214,120,255,${0.06 + 0.06 * Math.sin(t / 900)})`; ctx.fillRect(gx + 4, gy + 4, RW - 8, RH - 8); } // grow-lights glow
+    const [lx, ly] = roomXY(1); if (S.sw.lab && !S.sw.save && S.jobs.includes('lab')) for (let i = 0; i < 4; i++) { const ph = ((t / 1800) + i / 4) % 1; ctx.fillStyle = `rgba(240,228,66,${1 - ph})`; ctx.fillRect(lx + 30 + i * 18, ly + 60 - ph * 40, 2, 2); } // science sparks
+    if (PREV) { const [bx, by] = roomXY(5), k = Math.max(0, S.batt) / S.cap, h = 48 * k, ph = (t / 1100) % 1, up = PREV.net >= 0, yy = by + 19 + 48 - (up ? ph * h : (1 - ph) * h);
+      if (h > 4) { ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(bx + 109, yy | 0, 10, 2); } } // charge moving in the battery
+  }
   function drawBase(t) {
     const s = S, moon = s.world === 'moon', L = light(s);
     ctx.fillStyle = moon ? '#000' : '#5a2a17'; ctx.fillRect(0, 0, CW, CH);
@@ -190,8 +204,9 @@
       if (isOn(r) === false) { ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x + 4, y + 4, RW - 8, RH - 8); }
       if (r.id === 'battery') { const k = Math.max(0, s.batt) / s.cap; ctx.fillStyle = '#000'; ctx.fillRect(x + 108, y + 18, 12, 50);
         ctx.fillStyle = k < .25 ? '#D55E00' : k < .5 ? '#E69F00' : '#009E73'; const h = r0(48 * k); ctx.fillRect(x + 109, y + 19 + 48 - h, 10, h); }
-      if (r.id === 'shelter' && moon) text(`${s.shelter} cm`, x + 26, y + RH - 6, '#fff', 10);
+      if (r.id === 'shelter' && moon && s.M.rad) text(`SOIL ${s.shelter}/${RU.safeSoilCm} cm`, x + 34, y + RH - 6, s.shelter >= RU.safeSoilCm ? '#3ddc97' : '#ff9a3c', 9); // only in missions with solar storms
     });
+    if (!still) ambient(t, s, moon, L);
     if (PREV && !still) { const n = PREV.net, k = Math.min(1, Math.abs(n) / 300), cnt = 4 + Math.round(k * 8);
       ctx.fillStyle = '#5b4a1a'; ctx.fillRect(381, SKY - 8, 2, 120); ctx.fillRect(256, 271, 128, 2);
       for (let i = 0; i < cnt; i++) { const ph = ((t / (900 - k * 500)) + i / cnt) % 1;
@@ -217,7 +232,7 @@
     if (r.id === 'battery') { const kk = Math.max(0, s.batt) / s.cap; ctx.fillStyle = '#000'; ctx.fillRect(334, 70, 30, 180);
       ctx.fillStyle = kk < .25 ? '#D55E00' : kk < .5 ? '#E69F00' : '#009E73'; const h = r0(176 * kk); ctx.fillRect(336, 72 + 176 - h, 26, h); text(`${r0(kk * 100)}%`, 349, 268, '#fff', 14); }
     if (r.id === 'greenhouse') { ctx.fillStyle = '#000'; ctx.fillRect(40, 286, 304, 14); ctx.fillStyle = '#009E73'; ctx.fillRect(42, 288, r0(300 * s.grow / N.growDays), 10); }
-    if (r.id === 'shelter' && s.world === 'moon') { const gx = 344, gy = 64, gh = 190, max = 14, hh = r0(gh * Math.min(1, s.shelter / max)), sy = gy + gh - r0(gh * RU.safeSoilCm / max);
+    if (r.id === 'shelter' && s.world === 'moon' && s.M.rad) { const gx = 344, gy = 64, gh = 190, max = 14, hh = r0(gh * Math.min(1, s.shelter / max)), sy = gy + gh - r0(gh * RU.safeSoilCm / max);
       ctx.fillStyle = '#000'; ctx.fillRect(gx, gy, 26, gh); ctx.fillStyle = '#8c8174'; ctx.fillRect(gx + 2, gy + gh - hh, 22, hh); ctx.fillStyle = '#F0E442'; ctx.fillRect(gx - 6, sy, 38, 2); text('safe', gx + 13, sy - 4, '#F0E442', 10); }
     if (r.id === 'airlock') { const bg = IMG[s.world === 'moon' ? 'bg_moon' : 'bg_mars'], wx = 286, wy = 50, ww = 90, wh = 60; ctx.fillStyle = '#9aa0a6'; ctx.fillRect(wx - 3, wy - 3, ww + 6, wh + 6);
       if (bg) ctx.drawImage(bg, 120, 40, 120, 80, wx, wy, ww, wh); const L = light(s); if (L < .9) { ctx.fillStyle = s.world === 'moon' ? `rgba(0,0,12,${(1 - L) * .75})` : `rgba(190,110,50,${(1 - L) * .7})`; ctx.fillRect(wx, wy, ww, wh); }
