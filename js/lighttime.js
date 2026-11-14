@@ -28,6 +28,12 @@
     const km = au * 149597870.7;
     return { au, km, seconds: km / 299792.458 };
   }
-  root.LightTime = { earthMarsLightTime };
+  // Mars–Sun distance today, and how bright the sunshine is compared with Mars' average distance (inverse-square law).
+  function marsSun(date) {
+    const jd = date.getTime() / 86400000 + 2440587.5, T = (jd - 2451545.0) / 36525, q = position('mars', T);
+    const au = Math.hypot(q[0], q[1], q[2]), a = EL.mars[0] + EL.mars[1] * T;
+    return { au, factor: (a / au) * (a / au) };
+  }
+  root.LightTime = { earthMarsLightTime, marsSun };
   if (typeof module !== 'undefined') module.exports = root.LightTime;
 })(typeof window !== 'undefined' ? window : globalThis);

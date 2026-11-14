@@ -81,10 +81,11 @@
     const L = light(s), base = W.baseKWh * (s.sw.save ? RU.saveFactor : 1);
     const maker = s.sw.maker ? (s.world === 'mars' ? (s.sw.save ? W.slowKWh : W.isruKWh) : W.makerKWh) : 0;
     const gh = s.sw.gh ? W.ghKWh : 0, lab = s.sw.lab && !s.sw.save ? W.labKWh : 0;
-    const gen = s.world === 'moon' ? W.solarKW * 24 * L : W.kiloKWh + W.arrays * W.arrayKWh * L;
+    const sunAU = s.sunFactor || 1; // Mars only: today's real Mars–Sun distance (NASA JPL, js/lighttime.js); 1 = average distance
+    const gen = s.world === 'moon' ? W.solarKW * 24 * L : W.kiloKWh + W.arrays * W.arrayKWh * L * sunAU;
     const use = base + maker + gh + lab + robot, net = gen - use;
     s.batt = Math.min(s.cap, s.batt + net);
-    math.push(s.world === 'moon' ? `Made: ${W.solarKW} kW × 24 h × ${r0(L * 100)} % sun = ${r0(gen)} kWh` : `Made: reactor ${W.kiloKWh} + panels ${W.arrays} × ${W.arrayKWh} × ${r0(L * 100)} % = ${r0(gen)} kWh`);
+    math.push(s.world === 'moon' ? `Made: ${W.solarKW} kW × 24 h × ${r0(L * 100)} % sun = ${r0(gen)} kWh` : `Made: reactor ${W.kiloKWh} + panels ${W.arrays} × ${W.arrayKWh} × ${r0(L * 100)} %${sunAU !== 1 ? ` × ${r0(sunAU * 100)} % (Sun distance)` : ''} = ${r0(gen)} kWh`);
     math.push(`Used: base ${r0(base)} + air maker ${r0(maker)} + greenhouse ${gh} + lab ${lab}${robot ? ' + robot ' + robot : ''} = ${r0(use)} → ${net >= 0 ? '+' : ''}${r0(net)} kWh`);
     if (s.world === 'moon' && L === 0) say.push(`🌑 No sun! The base used ${r0(use)} kWh from the battery.`);
     else if (s.world === 'mars' && s.M.dust[s.day] !== undefined) say.push(`🌪️ Dust storm: the panels got only ${r0(L * 100)} % of the sunlight${s.tilt ? ' (tilted)' : ''}.`);
@@ -109,7 +110,11 @@
     }
     let storm = 0;
     if (s.M.rad) {
-      if (ev) { const out = pick === 'exposed' && outside > 0, g = out ? N.suitGcm2 : (pick === 'exposed' ? N.habWall : s.shelter * N.soilGcm2PerCm);
+      if (ev && s.world === 'mars') { // Mars: the thick air already shields; size from NASA's Curiosity rover in May 2024 (RD-13), times the real Sun
+        const base = W.doseDay * N.marsStormX * SUN.mult; storm = pick === 'shelter' ? base * RU.marsShelterFactor : base;
+        say.push(`☢️ A solar storm reached Mars. ${pick === 'shelter' ? 'Inside the shelter' : 'Under the thick Martian air'}: about ${r1(storm)} mSv each.`);
+        math.push(`Storm on Mars: ${W.doseDay} × ${N.marsStormX} (Curiosity, May 2024) × ${SUN.mult} (real Sun: ${SUN.word})${pick === 'shelter' ? ` × ${RU.marsShelterFactor} (shelter)` : ''} = ${r1(storm)} mSv`); }
+      else if (ev) { const out = pick === 'exposed' && outside > 0, g = out ? N.suitGcm2 : (pick === 'exposed' ? N.habWall : s.shelter * N.soilGcm2PerCm);
         storm = stormDose(g) * SUN.mult;
         say.push(out ? `☢️ The storm hit while astronauts were outside: about ${r0(storm)} mSv each!` : `☢️ The storm hit. Behind ${pick === 'exposed' ? 'thin walls' : s.shelter + ' cm of moon soil'}: about ${r0(storm)} mSv each.`);
         math.push(`Storm: ${r0(stormDose(g))} for a big storm at ${r1(g)} g/cm² × ${SUN.mult} (real Sun: ${SUN.word}) = ${r0(storm)} mSv`); }

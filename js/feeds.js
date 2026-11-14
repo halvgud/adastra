@@ -19,7 +19,7 @@
       const url = k => src.api.replace('{type}', k).replace('{start}', ymd(start)).replace('{end}', ymd(end));
       const [f, s] = await Promise.all(src.types.map(k => fetch(url(k), { signal: ctl.signal }).then(r => { if (!r.ok) throw r.status; return r.json(); })));
       clearTimeout(tm);
-      return make('LIVE', `fetched ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`, f.map(x => ({ cls: x.classType })), s);
+      return make('LIVE', `fetched ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`, f.map(x => ({ cls: x.classType, peak: x.peakTime })), s);
     } catch (e) {
       return make('ARCHIVED', `snapshot ${SNAP.snapshotOf} · couldn't reach NASA`, SNAP.flares, SNAP.seps);
     }

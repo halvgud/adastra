@@ -7,9 +7,9 @@ You command a small base on the Moon or Mars and balance power, air and water, r
 
 ## Real data
 
-- **NASA DONKI** (live): today's solar activity sets how big the solar storms are.
-- **NASA OSDR RadLab**: the real May 2024 solar storm, measured by BioSentinel and Curiosity.
-- **NASA JPL planet positions**: today's radio delay between Earth and Mars.
+- **NASA DONKI** (live): this week's real flares set how big the solar storms are on the Moon and on Mars, and the warnings name the biggest real flare.
+- **NASA OSDR**: RadLab measurements of the May 2024 storm (BioSentinel in deep space, Curiosity on Mars) size the storms; four real astronaut-health and plant studies appear in the rooms.
+- **NASA JPL planet positions**: today's radio delay between Earth and Mars, and today's Mars–Sun distance, which sets how much power the Mars solar panels make.
 - **NASA Mars Trek**: where the Mars base is (Jezero Crater).
 - **Canadian Space Agency**: food in space.
 

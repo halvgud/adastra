@@ -21,7 +21,7 @@ JAMT_DATA.sources = {
     kind: 'live', model: 'DS-01', url: 'https://ccmc.gsfc.nasa.gov/tools/DONKI/', feature: 'sun', official: true,
     api: 'https://ccmc.gsfc.nasa.gov/DONKI/WS/get/{type}?startDate={start}&endDate={end}', types: ['FLR', 'SEP'], days: 7, timeoutMs: 5000,
     archive: 'data/donki-snapshot.js',
-    usedFor: 'The Sun’s face in the sky, and how big solar storms are in your missions.',
+    usedFor: 'The Sun’s face in the sky, the real biggest flare of the week in storm warnings, and how big solar storms are on the Moon and on Mars.',
   },
   radlab_biosentinel: {
     name: 'NASA OSDR RadLab · BioSentinel', full: 'NASA Open Science Data Repository, RadLab: BPD detector on BioSentinel (deep space)', agency: 'NASA', short: 'OSDR',
@@ -33,12 +33,12 @@ JAMT_DATA.sources = {
     name: 'NASA OSDR RadLab · Curiosity RAD', full: 'NASA Open Science Data Repository, RadLab: RAD detector on the Curiosity rover (Mars surface)', agency: 'NASA', short: 'OSDR',
     kind: 'archived', retrieved: '2026-10-28', model: 'DS-02', url: 'https://visualization.osdr.nasa.gov/radlab/gui/data-api/', feature: 'chart', official: true,
     archive: 'data/donki-snapshot.js',
-    usedFor: 'The same May 2024 storm on the surface of Mars: about 17× a normal sol.',
+    usedFor: 'The same May 2024 storm on the surface of Mars: about 17× a normal sol. It sets the size of the storm in “Call Earth”.',
   },
   jpl_planets: {
     name: 'NASA JPL “Approximate Positions of the Planets”', agency: 'NASA', short: 'JPL',
     kind: 'calculated', model: 'DS-04', url: 'https://ssd.jpl.nasa.gov/planets/approx_pos.html', feature: 'radio',
-    usedFor: 'How long a radio message takes between Earth and Mars today.',
+    usedFor: 'How long a radio message takes between Earth and Mars today, and how far Mars is from the Sun today, which sets how much power the Mars solar panels make.',
   },
   opportunity_2018: {
     name: 'NASA’s Opportunity rover, 2018 dust storm', full: 'Opportunity energy figures as reported by The Planetary Society, MER update (Aug 2018)', agency: 'NASA rover data',
@@ -69,6 +69,28 @@ JAMT_DATA.sources = {
     name: 'NASA studies and reports', full: 'Life support, power, radiation and food numbers; every row and its source is listed in docs/MODEL.md', agency: 'NASA and others',
     kind: 'published', model: 'all rows', url: 'docs/MODEL.md', feature: 'numbers',
     usedFor: 'Air, water, food, power and radiation numbers in the simulation.',
+  },
+  // NASA OSDR studies (official challenge resource). The OSDR search API only answers its own website, so these are an
+  // archived copy: each sentence in data/text.js → studies says only what the study's own OSDR description says.
+  osdr_bone: {
+    name: 'NASA OSDR · OSD-18 (bone in modeled microgravity)', agency: 'NASA', short: 'OSDR', kind: 'archived', retrieved: '2026-11-14', model: '—',
+    url: 'https://osdr.nasa.gov/bio/repo/data/studies/OSD-18', official: true,
+    usedFor: 'Astronauts can lose 10–15 % of their bone mass in space (shown in the shelter).',
+  },
+  osdr_muscle: {
+    name: 'NASA OSDR · OSD-342 (muscle and bone of mice on the Space Station)', agency: 'NASA', short: 'OSDR', kind: 'archived', retrieved: '2026-11-14', model: '—',
+    url: 'https://osdr.nasa.gov/bio/repo/data/studies/OSD-342', official: true,
+    usedFor: 'Long trips in space make muscles and bones weaker; scientists tested a way to protect them on the Space Station (shown in the airlock).',
+  },
+  osdr_bedrest: {
+    name: 'NASA OSDR · OSD-195 (21 days of bed rest)', agency: 'NASA', short: 'OSDR', kind: 'archived', retrieved: '2026-11-14', model: '—',
+    url: 'https://osdr.nasa.gov/bio/repo/data/studies/OSD-195', official: true,
+    usedFor: 'Scientists study bed rest on Earth to learn how muscles change without use (shown in the shelter).',
+  },
+  osdr_lettuce: {
+    name: 'NASA OSDR · OSD-268 (lettuce grown on the Space Station)', agency: 'NASA', short: 'OSDR', kind: 'archived', retrieved: '2026-11-14', model: '—',
+    url: 'https://osdr.nasa.gov/bio/repo/data/studies/OSD-268', official: true,
+    usedFor: 'Lettuce grown in Veggie on the Space Station was brought back to Earth to check its nutrients and microbes (shown in the greenhouse).',
   },
   // Pages opened and checked on 2026-11-13 (the sentence each fact uses is on the page).
   csa_food: {

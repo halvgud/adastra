@@ -25,6 +25,7 @@ JAMT_DATA.model = {
   suitGcm2: 0.5,      // an astronaut outside, in a suit
   habWall: 5,         // g/cm² of the habitat wall, outside the shelter
   soilGcm2PerCm: 1.5, // each cm of moon soil
+  marsStormX: 17,     // a big storm on the surface of Mars ≈ 17 normal sols of radiation (NASA Curiosity RAD, 20 May 2024)
   limit30: 250,       // mSv: the most NASA allows in 30 days (the mission pauses above this in one night)
   careerLimit: 600,   // mSv: career limit, the top of the radiation meter
 
@@ -43,7 +44,7 @@ JAMT_DATA.model = {
     'mars.isruKWh': 'IS-07: half the plant, 5.4 kg × 16 kWh/kg', 'mars.isruO2': 'IS-07: half of 10.8 kg a sol', 'mars.slowKWh': 'rule', 'mars.slowO2': 'rule', 'mars.tankKg': '?',
     'mars.ghKWh': '?', 'mars.labKWh': 'design', 'mars.doseDay': 'RD-01', 'mars.cruiseDose': 'RD-15',
     o2Use: 'LS-03, LS-01: 4 × 1.083', waterLoss: 'LS-09', waterBroken: 'LS-10', foodUse: 'LS-12, LS-01: 4 × 1.56', suitO2: '?', tripDose: '?', robotKWh: '?',
-    storm: 'RD-08, RD-09, RD-10', suitGcm2: '?', habWall: '?', soilGcm2PerCm: 'IS-09', limit30: 'RD-07', careerLimit: 'RD-06', harvestKg: '?', growDays: 'FD-01',
+    storm: 'RD-08, RD-09, RD-10', marsStormX: 'RD-13, DS-02: 1,660 µGy in one sol vs ≈ 100 a normal sol', suitGcm2: '?', habWall: '?', soilGcm2PerCm: 'IS-09', limit30: 'RD-07', careerLimit: 'RD-06', harvestKg: '?', growDays: 'FD-01',
   },
 
   start: {
@@ -73,7 +74,8 @@ JAMT_DATA.model = {
     wearBreaks: 7,                     // days of wear before the water recycler breaks
     fixWork: 2, fixAlone: 1, fixWithHelp: 2, // repair work needed, and work per day alone or with advice from Earth
     soilPerJob: 2, soilPerRobot: 2,    // cm of soil added to the shelter
-    safeSoilCm: 7,                     // the "safe" line shown on the shelter
+    safeSoilCm: 7,
+    marsShelterFactor: 0.5,            // on Mars, sheltering halves a storm's dose (game rule: no sourced number for a habitat on Mars)                     // the "safe" line shown on the shelter
     // How the real Sun (NASA DONKI, last 7 days) sets the size of storms in the missions.
     // mult = size of the storm, as a part of the "big storm" table above. Until v0.3 these were 0.15 / 0.4 / 1.0, and with a
     // calm or busy Sun nothing bad could happen in a storm (tests.html). Now, with limit30 = 250 mSv in one night:

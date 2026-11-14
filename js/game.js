@@ -311,7 +311,9 @@
       stats.push(`today ${p.net >= 0 ? '+' : ''}${r0(p.net)} kWh`, s.sw.save ? '🌙 power-save ON' : '☀️ power-save OFF');
       whatif = moon ? `🌑 With no sun, using ${r0(drain)} kWh a day, this battery lasts ${r1(lasts)} days.` : `🌪️ In a dust storm (30 % sun), it lasts ${r1(lasts)} sols at today's use.`;
       lines.push(moon ? `No sun: lasts ${r1(lasts)} days` : `Dust storm: lasts ${r1(lasts)} sols`); }
-    const fact = (FACTS[r.id] || {})[s.world] || {};
+    // the room's fact, alternating by day with a real NASA study from OSDR (data/text.js → studies)
+    const opts = [(FACTS[r.id] || {})[s.world] || {}, ...(T.studies || []).filter(x => x.room === r.id).map(x => ({ text: x.text, tag: 'NASA STUDY · OSDR' }))];
+    const fact = opts[s.day % opts.length] || {};
     return { stats, whatif, lines, badge, badgeCol, fact: fact.text || '', factTag: fact.tag || 'REAL NASA' };
   }
 
@@ -503,7 +505,8 @@
 
   const srcLine = src => src ? `<div class="src"><span class="tag2 real">${src.tag}</span>${src.text}</div>` : '';
   const eventVars = () => ({ cmd: CMD(), unit: S.unit, cargoDay: S.M.cargo ? S.M.cargo.day : '', foodDays: Math.floor(Math.max(0, S.food) / N.foodUse), sun: sunWord, sunSize: sunWord === 'STORMY' ? RU.sun.STORMY.size.toUpperCase() : RU.sun[sunWord].size,
-    robotKWh: N.robotKWh, soilPerRobot: RU.soilPerRobot, dusty: r0(RU.dustyAfter * 100) });
+    robotKWh: N.robotKWh, soilPerRobot: RU.soilPerRobot, dusty: r0(RU.dustyAfter * 100), flare: BIGFLARE || 'none this week',
+    delay: (() => { const lt = LightTime.earthMarsLightTime(new Date()); return `${Math.floor(lt.seconds / 60)} min ${r0(lt.seconds % 60)} s`; })() });
   function eventPopup() { // shows today's decision, whatever it is: the text and the effects are in data/missions.js → events
     const ev = evToday(S); if (!ev || ev.choice !== null) return false;
     const E = EVENTS[ev.kind], v = eventVars();
@@ -547,7 +550,7 @@
     const lt = LightTime.earthMarsLightTime(new Date()), SRC = DATA.sources;
     popup(`<h2>📚 Real NASA data in this game</h2>
       <h3>☀️ The Sun today</h3>${sunInfo || 'Checking with NASA…'}
-      <h3>📡 Radio to Mars, today</h3><p>Mars is ${(lt.km / 1e6).toFixed(0)} million km away, so radio takes ${Math.floor(lt.seconds / 60)} min ${r0(lt.seconds % 60)} s each way.</p><div class="src"><span class="tag2 calc">CALCULATED TODAY</span>${SRC.jpl_planets.name}.</div>
+      <h3>📡 Radio to Mars, today</h3><p>Mars is ${(lt.km / 1e6).toFixed(0)} million km away, so radio takes ${Math.floor(lt.seconds / 60)} min ${r0(lt.seconds % 60)} s each way.</p>${(() => { const ms = LightTime.marsSun(new Date()); return `<p>Mars is ${ms.au.toFixed(2)} times as far from the Sun as Earth is, so its sunshine today is ${r0(ms.factor * 100)} % of its average: that sets the power of your Mars solar panels.</p>`; })()}<div class="src"><span class="tag2 calc">CALCULATED TODAY</span>${SRC.jpl_planets.name}.</div>
       <h3>☢️ A real solar storm: May 2024</h3><canvas class="chart" id="chart" width="240" height="96" role="img" aria-label="Radiation per day in May 2024: deep space up to about 57 times a normal day, Mars surface about 17 times."></canvas>
       <div class="legend"><span><i style="background:#CC79A7"></i>Deep space (BioSentinel)</span><span><i style="background:#E69F00"></i>Mars surface (Curiosity)</span><span><i style="background:#56B4E9"></i>a normal day</span></div>
       <div class="src"><span class="tag2 real">REAL DATA</span>NASA OSDR RadLab: BioSentinel BPD and Curiosity RAD, absorbed dose per day. NASA DONKI: 21 big (X) flares that month.</div>
@@ -772,9 +775,12 @@
     $('cback').onclick = () => { SFX.tap(); missionMenu(); };
   }
   function start(k, code) { tune(k); S = fresh(k, code || (1000 + Math.floor(Math.random() * 9000))); selected = null; HINT = null; hintSeen = {}; view = { mode: 'base', room: null, t0: 0 }; closeAll();
+    let sunLine = '';
+    if (S.world === 'mars') { const ms = LightTime.marsSun(new Date()); S.sunFactor = Math.round(ms.factor * 100) / 100; // today's real Mars–Sun distance sets how much the panels make
+      sunLine = `<p class="src"><span class="tag2 calc">CALCULATED TODAY</span>Today Mars is ${ms.au.toFixed(2)} times as far from the Sun as Earth is: your solar panels get <b>${r0(S.sunFactor * 100)} %</b> of Mars' average sunshine. (NASA JPL orbits)</p>`; }
     CREW.forEach((c, i) => { crewPos[i].room = 3; crewPos[i].x = 22 + i * 26; }); hud();
     const P = (T.places || {})[S.world];
-    const intro = () => { popup(`<h2>${S.world === 'moon' ? '🌙' : '🔴'} ${S.M.title}</h2>${mcSay(`<p style="margin:0">${fmt(S.M.intro, { cmd: CMD() })}</p><p>Goal: <b>${S.goal} ⭐</b> by ${S.unit} ${S.days}, and keep everyone safe.</p>`)}<p class="src">Mission code #${S.code}</p>
+    const intro = () => { popup(`<h2>${S.world === 'moon' ? '🌙' : '🔴'} ${S.M.title}</h2>${mcSay(`<p style="margin:0">${fmt(S.M.intro, { cmd: CMD() })}</p><p>Goal: <b>${S.goal} ⭐</b> by ${S.unit} ${S.days}, and keep everyone safe.</p>`)}${sunLine}<p class="src">Mission code #${S.code}</p>
         <button class="big primary" data-close>Let's go! ▶</button>${P ? `<button class="big" id="where"><span class="e">📍</span><span>Where is your base?<small>${esc(P.name)}</small></span></button>` : ''}`);
       $('popcard').querySelector('[data-close]').onclick = () => { closeAll(); if (S.M.tutorial && !store.get('jamt-tut')) { TUT = { i: 0 }; tutShow(); } else if (!eventPopup()) autoHint(); };
       if (P) $('where').onclick = () => { SFX.tap(); placePopup(S.world, intro); }; };
@@ -787,9 +793,12 @@
   $('menu').onclick = () => { SFX.tap(); missionMenu(); };
 
   // ---------- today's real Sun (js/feeds.js: live NASA DONKI, or the archived snapshot, clearly labeled) ----------
+  let BIGFLARE = ''; // the real Sun's biggest flare this week, for the storm warnings, e.g. "M5.2 on 10 Nov"
   function setSun(feed) {
     const L = feed.level, src = DATA.sources[feed.source]; sunWord = L.word; sunMult = L.mult; SIM.setSun(L); FEED_STATUS[feed.source] = feed.status;
-    sunInfo = `<span class="tag2 ${STATUS_TAG[feed.status]}">${feed.status}</span> ${src.name} · ${feed.note}<p>In the last ${src.days} days the real Sun made <b>${L.total}</b> ${w('flare', 'flares')}: ${L.x} big (X), ${L.m} medium (M), ${L.small} small. Particle storms: <b>${L.particleStorms ? 'yes' : 'none'}</b>.</p><p>So the Sun's face is <b>${L.face}</b>, and storms in your missions are ${L.size}.</p><div class="src"><span class="tag2 rule">GAME RULE</span>The real Sun sets how big storms are. Game days are not real days. · ${src.name}: ${src.url.replace('https://', '').replace(/\/$/, '')}</div>`;
+    const score = c => ('BCMX'.indexOf(c[0]) * 100) + parseFloat(c.slice(1) || 0), big = (feed.flares || []).filter(f => f.cls).sort((a, b) => score(b.cls) - score(a.cls))[0];
+    BIGFLARE = big ? `${big.cls}${big.peak ? ' on ' + new Date(big.peak).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''}` : '';
+    sunInfo = `<span class="tag2 ${STATUS_TAG[feed.status]}">${feed.status}</span> ${src.name} · ${feed.note}<p>In the last ${src.days} days the real Sun made <b>${L.total}</b> ${w('flare', 'flares')}: ${L.x} big (X), ${L.m} medium (M), ${L.small} small. Particle storms: <b>${L.particleStorms ? 'yes' : 'none'}</b>.</p><p>${BIGFLARE ? `<p>Biggest flare: <b>${BIGFLARE}</b>.</p>` : ''}<p>So the Sun's face is <b>${L.face}</b>, and storms in the Moon and Mars missions are ${L.size}.</p><div class="src"><span class="tag2 rule">GAME RULE</span>The real Sun sets how big storms are. Game days are not real days. · ${src.name}: ${src.url.replace('https://', '').replace(/\/$/, '')}</div>`;
   }
   async function loadSun() { setSun(await FEEDS.sun(new URLSearchParams(location.search))); }
   function placeSunButton() { const [x, y, r] = SUNPOS(), k = $('base').clientWidth / CW, R = r + 6;

@@ -83,6 +83,14 @@ JAMT_DATA.text = {
       fact: 'Global dust storms on Mars happen about once every three Mars years, and they can last for weeks or months.', src: 'nasa_dust_storms' },
   },
 
+  // Real NASA studies from OSDR (archived copy, see data/sources.js), shown in rooms on alternate days next to the room's fact.
+  studies: [
+    { room: 'shelter', text: 'NASA scientists study why astronauts can lose 10 to 15 % of their bone mass during spaceflight.', src: 'osdr_bone' },
+    { room: 'shelter', text: 'In one NASA study, 14 volunteers stayed in bed for 21 days, so scientists could see how muscles change when they are not used.', src: 'osdr_bedrest' },
+    { room: 'airlock', text: 'Long trips in space make muscles and bones weaker. On the Space Station, scientists tested a way to protect them.', src: 'osdr_muscle' },
+    { room: 'greenhouse', text: 'Lettuce grown in NASA’s Veggie garden on the Space Station was brought back to Earth so scientists could check its nutrients and microbes.', src: 'osdr_lettuce' },
+  ],
+
   // One real fact per room and world, shown when the player zooms into a room.
   // tag = the badge in front of it (default 'REAL NASA'). src = id in data/sources.js, or null if not attached yet.
   facts: {

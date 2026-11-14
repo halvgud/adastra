@@ -51,7 +51,7 @@ JAMT_DATA.missions = {
     // and a broken recycler could never empty it), so a crew that never repairs runs dry before sol 20.
     start: { wear: [5, 6], water: 100 },
     repairMatters: true, // tests.html: a player who never repairs the recycler must not earn the patch
-    plan: [],
+    plan: [{ type: 'event', event: 'marsstorm', day: [14, 16] }], // its size comes from the real Sun (NASA DONKI), like on the Moon
   },
   moon3: {
     world: 'moon', title: 'The late ship', teach: '🍽️ Food', meters: ['food', 'power'], life: false, rad: false, food: true, goal: 12,
@@ -79,7 +79,7 @@ JAMT_DATA.missions = {
 JAMT_DATA.events = {
   storm: {
     storm: true, title: '☀️ Solar storm tonight!',
-    say: "{cmd}, a [[flare|solar flare]] is sending a particle storm. On the Moon no air protects you. The real Sun today is <b>{sun}</b>, so it's a {sunSize} storm.",
+    say: "{cmd}, a [[flare|solar flare]] is sending a particle storm. On the Moon no air protects you. The real Sun this week is <b>{sun}</b> (biggest flare: {flare}), so it's a {sunSize} storm.",
     timer: 15, ifIgnored: 1, safe: 0,
     choices: [
       { icon: '🛡️', label: 'Everyone into the shelter', sub: 'no jobs today · smallest dose', sim: 'shelter', jobsAll: 'rest' },
@@ -109,6 +109,17 @@ JAMT_DATA.events = {
       { icon: '☀️', label: 'Keep them pointed at the Sun', sub: 'more power now, but dust buries them: only {dusty} % until cleaned', state: { tilt: false } },
     ],
     src: { tag: 'REAL IDEA', ids: ['tilt_arrays'], text: 'NASA studied Mars solar arrays that tilt to 45° to shed dust (NASA/TM-2017-219467). The exact numbers here are game rules.' },
+  },
+  marsstorm: {
+    storm: true, title: '☀️ A solar storm is heading to Mars!',
+    say: "{cmd}, NASA saw a big [[flare|flare]] on the Sun. This warning took <b>{delay}</b> to reach you by radio. The real Sun this week is <b>{sun}</b> (biggest flare: {flare}). Mars' thick air already blocks part of a storm.",
+    timer: 15, ifIgnored: 1, safe: 0,
+    choices: [
+      { icon: '🛡️', label: 'Everyone into the shelter', sub: 'half the dose · but no jobs today', sim: 'shelter', jobsAll: 'rest' },
+      { icon: '🔬', label: 'Keep working', sub: 'the Martian air protects you · a little more [[dose|dose]]', sim: 'exposed' },
+    ],
+    src: { tag: 'REAL', ids: ['radlab_curiosity', 'donki', 'jpl_planets'],
+      text: 'In May 2024, NASA’s Curiosity rover measured a storm on Mars at about 17× a normal sol (NASA OSDR RadLab). On the Moon, with no air, the same storm is much worse. Radio delay: NASA JPL orbits, today. Shelter halving the dose = game rule.' },
   },
   lateship: {
     title: '📦 The cargo ship is late!',
