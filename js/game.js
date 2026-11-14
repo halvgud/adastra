@@ -180,6 +180,10 @@
     const p = crewPos[k]; if (p.room !== ri) { p.room = ri; p.x = (ri % 3) * RW + 6; } p.tx = p.home = (ri % 3) * RW + 22 + (n[ri] - 1) * 26; p.next = 0; }); }
   // ---------- the crew and the world move on their own ----------
   const OUTSIDE = { trip: 'samples', clean: 'panels', regolith: 'soil' }; // jobs done out on the surface
+  let PANELS_DARK = null; // the panel picture with a dark tint on its own pixels only (source-atop), redrawn each frame
+  function shadedPanels(a) { const im = IMG.panels; if (!PANELS_DARK) { PANELS_DARK = document.createElement('canvas'); PANELS_DARK.width = im.width; PANELS_DARK.height = im.height; }
+    const g = PANELS_DARK.getContext('2d'); g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, im.width, im.height); g.drawImage(im, 0, 0);
+    g.globalCompositeOperation = 'source-atop'; g.fillStyle = `rgba(0,0,0,${a})`; g.fillRect(0, 0, im.width, im.height); g.globalCompositeOperation = 'source-over'; return PANELS_DARK; }
   function drawOutside(t, k, p, job) {
     const zone = job === 'clean' ? [258, 370] : job === 'regolith' ? [20, 150] : [20, 236], foot = SKY - 5;
     if (p.ox === undefined || p.ojob !== job) { p.ox = zone[0] + 10 + k * 14; p.otx = p.ox; p.ojob = job; p.onext = 0; }
@@ -242,7 +246,7 @@
       if (!still) for (let i = 0; i < 70; i++) { const x = ((i * 53 + t * 0.06 * (1 + i % 3)) % CW), y = (i * 37) % SKY; ctx.fillStyle = '#e8b27a'; ctx.fillRect(x | 0, y, 2, 1); } }
     if (!(moon && L === 0)) drawSun(...SUNPOS());
     if (IMG.panels) { ctx.save(); if (s.tilt && dust > 0) { ctx.translate(314, SKY - 32); ctx.transform(1, 0, -0.35, 1, 0, 0); ctx.translate(-314, -(SKY - 32)); }
-      ctx.drawImage(IMG.panels, 250, SKY - 64); ctx.restore(); const dark = 1 - Math.min(1, L); if (dark > 0.05) { ctx.fillStyle = `rgba(0,0,0,${dark * 0.65})`; ctx.fillRect(250, SKY - 64, 128, 64); }
+      const dark = 1 - Math.min(1, L); ctx.drawImage(dark > 0.05 ? shadedPanels(dark * 0.65) : IMG.panels, 250, SKY - 64); ctx.restore(); // less sun: only the panels get darker, not a box around them
       if (!moon && s.clean < 0.9) { ctx.fillStyle = 'rgba(160,90,40,.55)'; ctx.fillRect(254, SKY - 58, 120, 30); } }
     if (!moon && IMG.reactor) ctx.drawImage(IMG.reactor, 182, SKY - 64);
     ctx.fillStyle = moon ? '#3a3d45' : '#4a2414'; ctx.fillRect(0, SKY, CW, CH - SKY);
@@ -419,11 +423,11 @@
   const MGR = RU.minigame || {};
   function miniReady(j) { const G = window.JAMT_MINI && JAMT_MINI.games[j] && T.minigames && T.minigames[j];
     if (!G || !S.jobs.includes(j) || (S.mgTried || {})[j] === S.day) return false;
-    if (j === 'fix') return S.broken;                       // the repair puzzle only when something is broken
+    // fix: when broken, winning finishes the repair; when not, it is a check-up and gives a star
     if (j === 'trip') return S.jobs.filter(x => x === 'trip').length >= RU.crewPerTrip;
     if (j === 'lab') return S.sw.lab && !S.sw.save;         // a dark lab gives no science, puzzle or not
     return true; }
-  const miniBonus = j => ({ fix: 'the repair is finished', regolith: `+${MGR.soilCm} cm of soil`, tend: `the lettuce grows ${MGR.growDays} extra days` }[j] || `+${MGR.stars} ⭐`);
+  const miniBonus = j => ({ fix: S && S.broken ? 'the repair is finished' : `+${MGR.stars} ⭐`, regolith: `+${MGR.soilCm} cm of soil`, tend: `the lettuce grows ${MGR.growDays} extra days` }[j] || `+${MGR.stars} ⭐`);
   function playMini(j) {
     const G = T.minigames[j], src = DATA.sources[G.src]; S.mgTried = S.mgTried || {}; S.mgTried[j] = S.day; let over = false;
     popup(`<h2>${G.title}</h2>${mcSay(G.how)}${timerBox()}<div class="mg" id="mg"></div><div class="tip" id="mgtip"></div>
@@ -444,8 +448,8 @@
         const team = S.jobs.map((jj, k) => jj === j ? k : -1).filter(k => k >= 0), buddy = team.find(k => k !== 0);
         const head = { trip: '🚀 Out on the surface…', clean: '🧽 Out to the solar panels…', regolith: '🛡️ Out to the shelter wall…', lab: '🔬 To the lab…', fix: '🔧 To the air maker…', tend: '🌱 To the greenhouse…' }[j];
         popup(`<h2>${head}</h2><div id="evahost"></div>`); $('popcard').classList.add('mgcard');
-        JAMT_EVA.play($('evahost'), { job: j, world: S.world, partner: j === 'trip' ? SPR.back[buddy != null ? buddy : 1] || null : null,
-          sound: k => k === 'door' ? beep([[220, .25], [180, .3]], 'sawtooth', .025) : k === 'clink' ? beep([[1400, .03], [900, .04]], 'square', .03) : beep([[90, .05]], 'triangle', .05) }, () => show());
+        JAMT_EVA.play($('evahost'), { job: j, world: S.world, banner: j === 'fix' && !S.broken ? `ALL CHECKED! +${MGR.stars} ★` : null, partner: j === 'trip' ? SPR.back[buddy != null ? buddy : 1] || null : null,
+          sound: k => k === 'door' ? beep([[220, .25], [180, .3]], 'sawtooth', .025) : k === 'clink' ? beep([[1400, .03], [900, .04]], 'square', .03) : k === 'pop' ? beep([[300, .04], [600, .06]], 'triangle', .05) : beep([[90, .05]], 'triangle', .05) }, () => show());
         return; }
       show();
       function show() {
@@ -527,7 +531,7 @@
     if (r.id === 'lab') acts.push(['job:lab', '🔬', 'Do science here', isOn(r) ? '1 astronaut · ⭐' : '⚠️ turn the lights on first']);
     if (r.id === 'greenhouse') acts.push(['job:tend', '🌱', 'Take care of the plants', `1 astronaut · lettuce ${s.grow}/${N.growDays}`]);
     if (r.id === 'greenhouse' && s.M.food) acts.push(['sw:ration', '🍽️', `Small meals ${s.sw.ration ? 'ON' : 'OFF'}`, `the food lasts longer, but hungry astronauts find less science · ${r1(Math.max(0, s.food))} kg of food left`, s.sw.ration]);
-    if (r.id === 'oxygen' && s.M.life) acts.push(['job:fix', '🔧', s.broken ? 'Fix the recycler!' : 'Check the machines', s.broken ? 'repairs the water recycler' : 'stops breakdowns']);
+    if (r.id === 'oxygen') acts.push(['job:fix', '🔧', s.broken ? 'Fix the recycler!' : 'Check the machines', s.broken ? 'repairs the water recycler' : s.M.life ? 'stops breakdowns' : `the air maker uses ${Math.round((1 - RU.tuneFactor) * 100)} % less power today`]);
     if (r.id === 'shelter') acts.push(['job:rest', '😴', 'Rest here', 'tired astronauts find less science']);
     if (r.id === 'battery') acts.push(['sw:save', s.sw.save ? '🌙' : '☀️', `Power-save ${s.sw.save ? 'ON' : 'OFF'}`, `uses ${r0((1 - RU.saveFactor) * 100)} % less, but the lab stops · battery ${r0(Math.max(0, s.batt))}/${s.cap} kWh`, s.sw.save]);
     const here = S.jobs.map((j, k) => j && roomFor(j) === r.id ? k : -1).filter(k => k >= 0);

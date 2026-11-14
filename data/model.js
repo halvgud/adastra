@@ -75,6 +75,7 @@ JAMT_DATA.model = {
     fixWork: 2, fixAlone: 1, fixWithHelp: 2, // repair work needed, and work per day alone or with advice from Earth
     soilPerJob: 2, soilPerRobot: 2,    // cm of soil added to the shelter
     safeSoilCm: 7,
+    tuneFactor: 0.8,                   // Moon: "Check the machines" makes the air maker use 80 % of its power that day
     marsShelterFactor: 0.5,            // on Mars, sheltering halves a storm's dose (game rule: no sourced number for a habitat on Mars)                     // the "safe" line shown on the shelter
     // How the real Sun (NASA DONKI, last 7 days) sets the size of storms in the missions.
     // mult = size of the storm, as a part of the "big storm" table above. Until v0.3 these were 0.15 / 0.4 / 1.0, and with a

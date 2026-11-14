@@ -76,10 +76,14 @@
     if (mg.regolith && did('regolith')) { s.shelter += MG.soilCm; say.push(`🎮 A neat wall: +${MG.soilCm} cm of soil`); }
     if (mg.tend && did('tend')) { s.grow += MG.growDays; say.push(`🎮 A careful harvest: the lettuce grew ${MG.growDays} extra days`); }
     if (mg.fix && did('fix') && s.broken) { s.broken = false; s.fixProg = 0; s.fixHelp = false; s.wear = 0; say.push('🎮 Pipes connected: the water recycler works again!'); }
+    else if (mg.fix && did('fix')) { stars += MG.stars; say.push(`🎮 Every pipe checked: +${MG.stars} ⭐`); } // a check-up puzzle (nothing broken): a star, like the other rooms
     s.mg = {};
     if (stars && s.happy > 0) stars += RU.happyStar;
     const L = light(s), base = W.baseKWh * (s.sw.save ? RU.saveFactor : 1);
-    const maker = s.sw.maker ? (s.world === 'mars' ? (s.sw.save ? W.slowKWh : W.isruKWh) : W.makerKWh) : 0;
+    // Moon: an astronaut checking the machines tunes the air maker, so it uses less power that day (game rule).
+    const tuned = s.world === 'moon' && s.sw.maker && fixes > 0 && !s.broken;
+    const maker = s.sw.maker ? (s.world === 'mars' ? (s.sw.save ? W.slowKWh : W.isruKWh) : W.makerKWh * (tuned ? RU.tuneFactor : 1)) : 0;
+    if (tuned) say.push(`🔧 Machines checked: the air maker used ${Math.round((1 - RU.tuneFactor) * 100)} % less power.`);
     const gh = s.sw.gh ? W.ghKWh : 0, lab = s.sw.lab && !s.sw.save ? W.labKWh : 0;
     const sunAU = s.sunFactor || 1; // Mars only: today's real Mars–Sun distance (NASA JPL, js/lighttime.js); 1 = average distance
     const gen = s.world === 'moon' ? W.solarKW * 24 * L : W.kiloKWh + W.arrays * W.arrayKWh * L * sunAU;

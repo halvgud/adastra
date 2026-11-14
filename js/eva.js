@@ -118,14 +118,24 @@
     return { x: 0.12 * Math.sin(t / 900), y: s, hy: 50 + (walking ? Math.sin(t / 190) * 1.3 : 0), walking, t }; }
 
   // ---------- your hand ----------
-  function arm(g, gx, gy, holding, tool) { // your glove at (gx, gy); a short forearm comes in from the bottom right
-    const ex = gx + 22, ey = gy + 48; g.lineCap = 'round';
-    g.strokeStyle = '#b9bfcc'; g.lineWidth = 16; g.beginPath(); g.moveTo(ex, ey); g.lineTo(gx + 2, gy + 6); g.stroke();
-    g.strokeStyle = '#e8ebf2'; g.lineWidth = 13; g.stroke();
-    g.lineCap = 'butt'; g.strokeStyle = '#d55e00'; g.lineWidth = 13; g.beginPath(); g.moveTo(gx + 6, gy + 16); g.lineTo(gx + 8, gy + 21); g.stroke(); // suit stripe at the cuff
-    if (holding) holding(gx, gy + 9);
-    g.fillStyle = '#f0f2f7'; g.fillRect(gx - 8, gy - 4, 16, 10); g.fillStyle = '#c9ced9'; g.fillRect(gx - 8, gy + 4, 16, 2);
-    for (let f = 0; f < 3; f++) { g.fillStyle = '#f0f2f7'; g.fillRect(gx - 7 + f * 5, gy + 6, 4, holding ? 6 : 4); }
+  // The forearm comes in from the bottom of the screen and gets narrower toward the wrist, with suit folds and an orange
+  // cuff. The glove points along the arm (palm, thumb, four fingers); holding(x, y) draws what the hand carries, and the
+  // fingers then close over it. (gx, gy) is about where the glove is.
+  function arm(g, gx, gy, holding, tool) {
+    const bx = gx + 30, by = H + 18, wx = gx + 2, wy = gy + 8, dx = wx - bx, dy = wy - by, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
+    const at = (k, w) => [bx + dx * k + nx * w, by + dy * k + ny * w], poly = pts => { g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.fill(); };
+    const half = k => 17 - 9 * k; // half the sleeve's width, from the screen edge (k = 0) to the wrist (k = 1)
+    g.fillStyle = '#aeb5c4'; poly([at(0, -half(0)), at(1, -half(1)), at(1, half(1)), at(0, half(0))]);                          // sleeve, shadow side
+    g.fillStyle = '#e4e8f0'; poly([at(0, -half(0)), at(1, -half(1)), at(1, half(1) * 0.35), at(0, half(0) * 0.35)]);          // sleeve, lit side
+    g.fillStyle = '#f7f8fb'; poly([at(0, -half(0) * 0.7), at(1, -half(1) * 0.7), at(1, -half(1) * 0.35), at(0, -half(0) * 0.35)]); // shine
+    [0.38, 0.62].forEach(k => { g.fillStyle = 'rgba(80,90,110,.45)'; poly([at(k, -half(k)), at(k + 0.03, -half(k + 0.03)), at(k + 0.03, half(k + 0.03)), at(k, half(k))]); }); // folds
+    g.fillStyle = '#d55e00'; poly([at(0.84, -half(0.84) - 1), at(0.92, -half(0.92) - 1), at(0.92, half(0.92) + 1), at(0.84, half(0.84) + 1)]); // cuff stripe
+    const glove = () => { g.save(); g.translate(wx, wy); g.rotate(Math.atan2(uy, ux)); }, R = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+    glove(); R(-3, -8, 15, 16, '#c9ced9'); R(-2, -7, 13, 14, '#f0f2f7'); R(-2, 3, 13, 3, '#dde1ea');                               // palm (back of the glove)
+    g.fillStyle = '#e6e9f0'; g.beginPath(); g.moveTo(2, -7); g.lineTo(9, -12); g.lineTo(12, -9); g.lineTo(6, -5); g.closePath(); g.fill(); g.restore(); // thumb
+    if (holding) holding(wx + ux * 15, wy + uy * 15);
+    glove(); const fl = holding ? 4 : 8; for (let f = 0; f < 4; f++) { R(10, -6 + f * 3.4, fl + (f === 1 || f === 2 ? 1 : 0), 3, '#f0f2f7'); R(10, -6 + f * 3.4 + 2.6, fl, 0.8, '#b9bfcc'); } // fingers, curled when holding
+    R(9, -7, 1, 14, '#b9bfcc'); g.restore();                                                                                      // knuckles
     if (tool) tool(gx, gy);
   }
   const sparkle = (g, x, y, t, s) => { const k = 0.5 + 0.5 * Math.sin(t / 90); g.fillStyle = `rgba(255,250,200,${0.4 + 0.6 * k})`; g.fillRect(x - s * k, y, s * 2 * k + 1, 1); g.fillRect(x, y - s * k, 1, s * 2 * k + 1); };
@@ -205,21 +215,45 @@
         const ok = seg(t, 7900, 8600); g.fillStyle = '#111'; g.beginPath(); g.arc(166, 22, 15, 0, 6.283); g.fill(); g.fillStyle = '#d55e00'; g.beginPath(); g.moveTo(166, 22); g.arc(166, 22, 13, 3.14, 4.4); g.fill(); g.fillStyle = '#009E73'; g.beginPath(); g.moveTo(166, 22); g.arc(166, 22, 13, 5.0, 6.28); g.fill();
         const na = 3.4 + ok * 2.6 + (leak ? Math.sin(t / 80) * 0.1 : 0); g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.moveTo(166, 22); g.lineTo(166 + Math.cos(na) * 12, 22 + Math.sin(na) * 12); g.stroke(); } },
 
-    tend: { outside: false, banner: 'HAPPY PLANTS! +2 days', at: 8300, theme: { wall: [170, 150, 190], ceil: [70, 60, 90], floor: [96, 90, 110], stripe: [204, 121, 167], glow: [230, 150, 255] },
-      close(g, t) { // grow lights, a tray of lettuce; your glove picks the big ripe one and puts it in the basket
-        g.fillStyle = '#2a1f3a'; g.fillRect(0, 0, W, H); const pulse = 0.5 + 0.5 * Math.sin(t / 500);
-        g.fillStyle = `rgba(214,120,255,${0.25 + 0.1 * pulse})`; g.fillRect(0, 0, W, H); g.fillStyle = '#f0c8ff'; g.fillRect(10, 4, W - 20, 5); g.fillStyle = '#ff7ad9'; for (let i = 0; i < 10; i++) g.fillRect(16 + i * 17, 9, 8, 2);
-        for (let i = 0; i < 9; i++) { const p = ((t / 900) + i / 9) % 1; g.fillStyle = `rgba(150,210,255,${1 - p})`; g.fillRect(20 + i * 19, 14 + p * 60, 1, 3); } // mist
-        g.fillStyle = '#5b4632'; g.fillRect(8, 92, W - 16, 22); g.fillStyle = '#3e3022'; g.fillRect(8, 92, W - 16, 4); // the tray
-        const k1 = ease(seg(t, 5800, 6800)), k2 = ease(seg(t, 6900, 7900)), picked = t > 6800;
-        const lettuce = (x, y, s, sway) => { for (let j = 0; j < 7; j++) { const a = j / 7 * 6.283 + sway; g.fillStyle = j % 2 ? '#4fbf5a' : '#2f9a46'; g.beginPath(); g.ellipse(x + Math.cos(a) * s * 0.5, y - s * 0.4 + Math.sin(a) * s * 0.25, s * 0.45, s * 0.3, a, 0, 6.283); g.fill(); }
-          g.fillStyle = '#9be07a'; g.beginPath(); g.ellipse(x, y - s * 0.5, s * 0.3, s * 0.22, 0, 0, 6.283); g.fill(); };
-        [30, 62, 130, 162].forEach((x, i) => lettuce(x, 94, 13 + (i % 2) * 3, Math.sin(t / 700 + i) * 0.1));
-        g.fillStyle = '#8a6a3a'; g.fillRect(4, 64, 34, 24); g.fillStyle = '#6a4e28'; for (let i = 0; i < 4; i++) g.fillRect(4, 68 + i * 5, 34, 1); // the basket
-        if (!picked) { lettuce(96, 94, 22, Math.sin(t / 600) * 0.08); sparkle(g, 108, 62, t, 5); }
-        if (t > 7900) lettuce(22, 70, 16, 0);
-        const gx = picked ? 96 + (22 - 96) * k2 : W / 2 + 50 + (96 - W / 2 - 50) * k1, gy = picked ? 74 - Math.sin(k2 * 3.14) * 34 - k2 * 6 : H + 20 + (74 - H - 20) * k1;
-        if (t > 5700) arm(g, gx, gy, picked && t <= 7900 ? (x, y) => lettuce(x, y + 14, 20, 0) : null); } },
+    tend: { outside: false, banner: 'HAPPY PLANTS! +2 days', at: 8700, theme: { wall: [170, 150, 190], ceil: [70, 60, 90], floor: [96, 90, 110], stripe: [204, 121, 167], glow: [230, 150, 255] },
+      close(g, t, X) { // grow lights over a tray of lettuce; your glove pulls up the ripe one (roots, soil and all) and drops it in the basket
+        g.fillStyle = '#251a33'; g.fillRect(0, 0, W, H); g.fillStyle = '#2f2342'; for (let i = 0; i < 8; i++) g.fillRect(i * 26, 0, 1, H); // wall panels
+        g.fillStyle = '#5c5470'; g.fillRect(0, 2, W, 3);                                                                         // the rack
+        const pulse = 0.5 + 0.5 * Math.sin(t / 500);
+        for (let i = 0; i < 4; i++) { const lx = 14 + i * 46; g.fillStyle = '#f6d6ff'; g.fillRect(lx, 6, 34, 4); g.fillStyle = '#ff7ad9'; for (let k = 0; k < 6; k++) g.fillRect(lx + 2 + k * 5, 10, 3, 1); // LED bars
+          const cone = g.createLinearGradient(0, 10, 0, 90); cone.addColorStop(0, `rgba(230,120,255,${0.28 + 0.08 * pulse})`); cone.addColorStop(1, 'rgba(230,120,255,0)'); g.fillStyle = cone;
+          g.beginPath(); g.moveTo(lx, 10); g.lineTo(lx + 34, 10); g.lineTo(lx + 44, 90); g.lineTo(lx - 10, 90); g.fill(); } // light falling on the plants
+        for (let i = 0; i < 12; i++) { const p = ((t / 1100) + i / 12) % 1; g.fillStyle = `rgba(180,220,255,${0.6 * (1 - p)})`; g.fillRect(8 + (i * 37) % 176, 14 + p * 66, 1, 2); } // mist
+        g.fillStyle = '#4a3a2a'; g.fillRect(6, 90, W - 12, 30); const sr = mkRnd(3); for (let i = 0; i < 90; i++) { g.fillStyle = sr() > 0.5 ? '#5e4a34' : '#3a2c1e'; g.fillRect(8 + sr() * (W - 16), 92 + sr() * 26, 2, 1); } // soil
+        g.fillStyle = '#7d8696'; g.fillRect(6, 88, W - 12, 3); g.fillStyle = '#56B4E9'; for (let i = 0; i < 6; i++) { const p = ((t / 700) + i / 6) % 1; g.fillRect(24 + i * 30, 91 + p * 6, 1, 2); } // drip line
+        const leaf = (x, y, s, sway, glow) => { // one lettuce: outer leaves, inner leaves, light veins
+          for (let j = 0; j < 9; j++) { const a = j / 9 * 6.283 + sway, r = s * (0.45 + 0.08 * (j % 3)); g.fillStyle = j % 2 ? '#3fae4e' : '#2a8a3e';
+            g.beginPath(); g.ellipse(x + Math.cos(a) * r, y - s * 0.35 + Math.sin(a) * r * 0.45, s * 0.42, s * 0.24, a, 0, 6.283); g.fill(); }
+          for (let j = 0; j < 5; j++) { const a = j / 5 * 6.283 + sway * 2; g.fillStyle = j % 2 ? '#7fd36a' : '#63c25a'; g.beginPath(); g.ellipse(x + Math.cos(a) * s * 0.2, y - s * 0.5 + Math.sin(a) * s * 0.12, s * 0.26, s * 0.18, a, 0, 6.283); g.fill(); }
+          g.strokeStyle = 'rgba(220,255,200,.55)'; g.lineWidth = 1; g.beginPath(); for (let j = 0; j < 6; j++) { const a = j / 6 * 6.283 + sway; g.moveTo(x, y - s * 0.45); g.lineTo(x + Math.cos(a) * s * 0.55, y - s * 0.4 + Math.sin(a) * s * 0.25); } g.stroke();
+          g.fillStyle = '#b8f09a'; g.beginPath(); g.ellipse(x, y - s * 0.55, s * 0.16, s * 0.11, 0, 0, 6.283); g.fill();
+          if (glow) { g.strokeStyle = `rgba(240,228,66,${0.4 + 0.4 * pulse})`; g.beginPath(); g.ellipse(x, y - s * 0.4, s * 0.75, s * 0.45, 0, 0, 6.283); g.stroke(); } };
+        const roots = (x, y, len) => { g.strokeStyle = '#eadfc4'; g.lineWidth = 1; g.beginPath(); for (let j = 0; j < 6; j++) { g.moveTo(x - 4 + j * 1.6, y); g.lineTo(x - 7 + j * 2.8 + Math.sin(j * 2 + t / 300), y + len * (0.6 + 0.2 * (j % 3))); } g.stroke(); };
+        [24, 58, 136, 170].forEach((x, i) => leaf(x, 100, 15 + (i % 2) * 3, Math.sin(t / 700 + i) * 0.1)); // the others keep growing
+        // the basket, with two lettuces already in it; it bounces when the new one lands
+        const land = seg(t, 8500, 8800), bounce = land > 0 && land < 1 ? Math.sin(land * 3.14) * 3 : 0;
+        leaf(18, 74 + bounce, 13, 0.3); leaf(34, 75 + bounce, 12, 1.2); if (t > 8500) leaf(26, 72 + bounce - (1 - ease(land)) * 12, 16, 0.6);
+        for (let r = 0; r < 4; r++) for (let q = 0; q < 7; q++) { g.fillStyle = (r + q) % 2 ? '#6e5128' : '#a07c46'; g.fillRect(5 + q * 6, 76 + r * 5 + bounce, 5, 4); } // woven sides
+        g.fillStyle = "#5a4020"; g.fillRect(4, 73 + bounce, 42, 3);
+        // the ripe one (with its tag) until the glove pulls it out
+        const P = { x: 96, y: 100 };
+        if (t < 6800) { const shake = t > 6600 ? Math.sin(t / 25) * 0.15 : 0; leaf(P.x, P.y, 24, Math.sin(t / 600) * 0.08 + shake, true); sparkle(g, 110, 72, t, 5); }
+        else { g.fillStyle = '#2e2216'; g.beginPath(); g.ellipse(P.x, P.y - 1, 9, 3, 0, 0, 6.283); g.fill(); } // the hole it left
+        g.fillStyle = '#e8e2d0'; g.fillRect(P.x + 10, 104, 22, 8); g.fillStyle = '#2a2a2a'; g.font = '5px ui-monospace, Consolas, monospace'; g.textAlign = 'center'; g.fillText('READY', P.x + 21, 110); // plant tag
+        // the hand: reach (5800-6700), grip (6700-7000), pull up with roots and crumbs (7000-7800), carry it to the basket (7800-8500)
+        const kR = ease(seg(t, 5800, 6700)), kU = ease(seg(t, 7000, 7800)), kC = ease(seg(t, 7800, 8500)), gripped = t > 6800 && t < 8500;
+        if (t > 6750 && t < 6800) X.sound('pop');
+        const grabX = P.x - 14, grabY = P.y - 32, upY = grabY - 16, bx = 18, by = 46;
+        const hx = t < 7800 ? (W / 2 + 70) + (grabX - W / 2 - 70) * kR : grabX + (bx - grabX) * kC;
+        const hy = t < 7800 ? (H + 30) + (grabY - H - 30) * kR + (upY - grabY) * kU : upY + (by - upY) * kC - Math.sin(kC * 3.14) * 10;
+        if (t > 7000 && t < 7900) for (let i = 0; i < 10; i++) { const p = seg(t, 7000 + i * 60, 7700 + i * 60); if (p > 0 && p < 1) { g.fillStyle = i % 2 ? '#5e4a34' : '#3a2c1e'; g.fillRect(P.x - 6 + (i % 5) * 3, P.y - 14 - kU * 16 + p * 20, 2, 2); } } // soil crumbs fall
+        if (t > 8500) for (let i = 0; i < 6; i++) { const p = seg(t, 8500, 9300); g.fillStyle = `rgba(130,220,110,${1 - p})`; g.fillRect(26 + Math.cos(i) * p * 24, 70 + Math.sin(i * 2) * p * 10 - p * 8, 2, 2); } // a few leaves fly
+        if (t > 5700 && t < 8900) arm(g, hx, hy, gripped ? (x, y) => { roots(x, y + 8, 4 + kU * 12); leaf(x, y + 10, 22, 0, false); } : null); } },
   };
 
   // ---------- shared overlays ----------
@@ -248,7 +282,7 @@
       if (S.outside) { c = S.draw(g, img, t, X); if (c) helmetOverlay(g, t, X); }
       else if (t < 5300) { c = corridorCam(t, still); drawCorridor(g, img, S.theme, c, ease(seg(t, 3600, 4700))); if (t > 3600 && t < 3650) X.sound('door'); helmetOverlay(g, t, X); flash(g, t, 5300); }
       else { S.close(g, t, X); flash(g, t, 5300); helmetOverlay(g, t, X); }
-      banner(g, t, S);
+      banner(g, t, { banner: opt.banner || S.banner, at: S.at });
       if (c && c.walking) { const step = Math.floor(t / (S.outside && moon ? 840 : 380)); if (step !== lastStep) { lastStep = step; X.sound('step'); } }
       if (t > DUR - 500) { g.fillStyle = `rgba(0,0,0,${(t - DUR + 500) / 500})`; g.fillRect(0, 0, W, H); }
       if (still || fixed) return;
