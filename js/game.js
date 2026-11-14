@@ -9,8 +9,21 @@
   $('coachimg').src = MCIMG;
 
   // ---------- Mission Control: the person on Earth who talks to the player (data/text.js → missionControl) ----------
-  const MC = T.missionControl || {}, MCNAME = MC.name || 'Mission Control';
-  $('coachimg').alt = MCNAME + ', Mission Control';
+  // Her name is hidden by default. It is stored encrypted (data/text.js → secretName) and shown only after ?mc=<passphrase>.
+  const MC = T.missionControl || {}; let MCNAME = '';
+  const mcLabel = () => MCNAME ? `${esc(MCNAME)} · Mission Control` : 'Mission Control';
+  $('coachimg').alt = 'Mission Control';
+  async function unlockName() {
+    const q = new URLSearchParams(location.search); let pass = q.get('mc');
+    if (pass === 'off') { store.set('jamt-mc', ''); pass = null; } else if (pass) store.set('jamt-mc', pass); else pass = store.get('jamt-mc');
+    if (q.has('mc')) { q.delete('mc'); const s = q.toString(); try { history.replaceState(null, '', location.pathname + (s ? '?' + s : '') + location.hash); } catch (e) {} } // keep the key out of the address bar
+    const X = MC.secretName; if (!pass || !X || !(window.crypto && crypto.subtle)) return;
+    try { const b = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+      const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+      const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b(X.salt), iterations: X.iter, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+      MCNAME = new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b(X.iv) }, key, b(X.data)));
+      $('coachimg').alt = MCNAME + ', Mission Control';
+    } catch (e) { MCNAME = ''; } } // a wrong key just leaves her anonymous
   // Glasses on the 64 × 64 portrait: [left, top, width, height] of each lens, found by reading the portrait's pixels.
   const GLASSES_MC = [[18, 21, 8, 5], [30, 21, 8, 5]];
   function dressMissionControl() { if (!MC.glasses) return; const im = new Image();
@@ -413,7 +426,7 @@
     $('coachtxt').innerHTML = r.speech; $('coachbtn').textContent = 'OK'; $('coachbtn').className = ''; $('coachmore').hidden = !r.math.length; $('coach').classList.add('show'); }
 
   // ---------- popups with Mission Control ----------
-  const mcSay = html => `<div class="mc"><img src="${MCIMG}" data-mc alt="${esc(MCNAME)}, Mission Control"><div class="bubble"><div class="mcname">${esc(MCNAME)} · Mission Control</div>${html}</div><button class="read" aria-label="Read this aloud">🔊</button></div>`;
+  const mcSay = html => `<div class="mc"><img src="${MCIMG}" data-mc alt="${mcLabel()}"><div class="bubble"><div class="mcname">${mcLabel()}</div>${html}</div><button class="read" aria-label="Read this aloud">🔊</button></div>`;
   let timerId = null;
   function popup(html) { clearTimer(); hush(); $('popcard').innerHTML = html; $('pop').classList.add('show'); $('popcard').querySelectorAll('[data-close]').forEach(b => b.onclick = closeAll); bindWords($('popcard'));
     bindRead($('popcard'));
@@ -457,7 +470,7 @@
   }
   function radio(forFix) {
     const moon = S.world === 'moon', lt = moon ? null : LightTime.earthMarsLightTime(new Date()), secs = moon ? 1.3 : Math.round(lt.seconds * 2 / 60), tip = hints()[0].text;
-    popup(`<h2>📡 Mission Control · ${esc(MCNAME)}</h2>${moon ? '<p>The Moon is 384,400 km away. Radio takes <b>1.3 seconds</b>.</p>' : `<p>Today Mars is <b>${(lt.km / 1e6).toFixed(0)} million km</b> away. Radio takes <b>${Math.floor(lt.seconds / 60)} min ${r0(lt.seconds % 60)} s</b> each way.</p>`}
+    popup(`<h2>📡 ${mcLabel()}</h2>${moon ? '<p>The Moon is 384,400 km away. Radio takes <b>1.3 seconds</b>.</p>' : `<p>Today Mars is <b>${(lt.km / 1e6).toFixed(0)} million km</b> away. Radio takes <b>${Math.floor(lt.seconds / 60)} min ${r0(lt.seconds % 60)} s</b> each way.</p>`}
       <div class="wave"><i id="sig" style="left:${moon ? 0 : 'calc(100% - 16px)'}"></i></div><div id="ans">${moon ? '' : `<p>📤 Question sent… the answer takes ${secs} minutes (${secs} seconds here). The base doesn’t wait!</p>`}</div>
       <div class="src"><span class="tag2 calc">${moon ? 'REAL DELAY' : 'CALCULATED TODAY'}</span>${moon ? 'Earth–Moon distance ÷ speed of light.' : 'From NASA JPL planet orbits. 1 real minute = 1 second here.'}</div><button class="big primary" data-close>OK</button>`);
     const done = () => { if (forFix) SIM.earthHelp(S); const a = $('ans'); if (a) a.innerHTML = mcSay(`<b>Answer:</b> ${forFix ? `Do steps 1 to 5 on the screen, ${CMD()}. One astronaut can fix it in 1 ${S.unit}.` : tip}`); if (a) bindRead(a); SFX.go(); };
@@ -664,7 +677,7 @@
 
   // ---------- name, missions and settings ----------
   function welcome(then) {
-    popup(`<h2>👩‍🚀 Welcome to your base!</h2>${mcSay(`Hi! I'm ${esc(MCNAME)}, from Mission Control. I'll help you run a base on the Moon or Mars. What should I call you, Commander?`)}
+    popup(`<h2>👩‍🚀 Welcome to your base!</h2>${mcSay(`${MCNAME ? `Hi! I'm ${esc(MCNAME)}, from Mission Control.` : "Hi! I'm Mission Control."} I'll help you run a base on the Moon or Mars. What should I call you, Commander?`)}
       <input type="text" id="nm" maxlength="14" placeholder="Your first name or a nickname" autocomplete="off" aria-label="Your name" value="${esc(NAME)}">
       <div class="src">🔒 Your name stays on this device. We never send it anywhere.</div>
       <label><input type="checkbox" id="tm" ${TIMERS ? 'checked' : ''}> ⏱ Quick-decision timers (turn off for more time)</label>
@@ -726,7 +739,7 @@
 
   // ---------- boot ----------
   loadArt().then(async () => {
-    await loadSun(); const h = new RegExp('^#(' + Object.keys(MISSIONS).join('|') + ')(?:-(\\d{4}))?$').exec(location.hash); // #mars2 or #mars2-4821 (a friend's mission code)
+    await unlockName(); await loadSun(); const h = new RegExp('^#(' + Object.keys(MISSIONS).join('|') + ')(?:-(\\d{4}))?$').exec(location.hash); // #mars2 or #mars2-4821 (a friend's mission code)
     S = fresh('moon1', 1234); hud(); placeSunButton(); requestAnimationFrame(loop);
     if (new URLSearchParams(location.search).has('test')) window.JAMT = { get S() { return S; }, finish, drawCard, patchBook, missionMenu }; // for automated tests only
     new MutationObserver(placeSunButton).observe($('mtitle'), { childList: true });

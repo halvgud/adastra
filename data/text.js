@@ -31,12 +31,15 @@ JAMT_DATA.text = {
   commander: { name: '', glasses: false, glassesColor: '#1c1f2b' },
 
   // Mission Control: the person on Earth who talks to the player in every message (portrait: assets/pixellab/ui/mission-control.png).
-  //   name     shown above her messages and in her greeting
+  //   secretName  her name, ENCRYPTED (AES-256-GCM, key from a passphrase with PBKDF2-SHA-256). By default nobody sees a name:
+  //               messages say just "Mission Control". Opening the game with ?mc=<passphrase> decrypts it and that device remembers it;
+  //               ?mc=off forgets it. The passphrase is not in this project: the owner keeps it.
   //   glasses  true = glasses drawn on the portrait by js/game.js (GLASSES_MC says where)
   //   voices   the 🔊 read-aloud uses the first browser voice whose name contains one of these words (English, women's voices on
   //            Windows, Chrome, Edge, macOS, iOS and Android). Browsers do not say which voices are female, so this goes by name.
   //   pitch    used only when none of those voices exists (1 = normal; a little higher sounds less like a man's voice)
-  missionControl: { name: 'Alejandra Olivas', glasses: true, glassesColor: '#1c1f2b',
+  missionControl: { glasses: true, glassesColor: '#1c1f2b',
+    secretName: { salt: 'uklP6YbE1464n1h7ybLQTw==', iv: 'rhpTnYKOYzzIg+xQ', iter: 150000, data: 'NwR2AwamYX91U2a17Fot2AcDmBeCvU5rUN/7sEwdI/Y=' },
     voices: ['Aria', 'Jenny', 'Zira', 'Michelle', 'Ava', 'Emma', 'Libby', 'Sonia', 'Natasha', 'Google US English', 'Google UK English Female',
       'Samantha', 'Karen', 'Moira', 'Tessa', 'Victoria', 'Susan', 'Hazel', 'Female', 'female'],
     pitch: 1.2 },
