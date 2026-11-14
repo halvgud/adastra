@@ -250,7 +250,16 @@
   .tip.show { display: block; }
   .math { font: .8rem/1.5 ui-monospace, Consolas, monospace; color: var(--muted); margin-top: 6px; }
   .link { background: none; border: 0; color: var(--info); text-decoration: underline; padding: 0; margin-top: 8px; }
-  .missions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; }
+  /* missions: a horizontal carousel you swipe (or use the arrows); each card snaps into place */
+  .missions { display: flex; gap: 12px; margin-top: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px 4px 12px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .missions::-webkit-scrollbar { display: none; } /* no scrollbar: arrows, swipe or the mouse wheel move it */
+  .missions .mission { flex: 0 0 78%; max-width: 340px; scroll-snap-align: center; }
+  .mission:hover, .mission:focus-visible { box-shadow: 0 0 0 3px var(--sun); }
+  .mission.sel { box-shadow: 0 0 0 4px var(--sun); } .mission.sel::after { content: '✓'; position: absolute; right: 8px; bottom: 8px; background: var(--sun); color: #000; font-weight: 900; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; }
+  button.big:disabled { opacity: .5; }
+  .carousel { position: relative; } .carousel .arr { position: absolute; top: 40%; z-index: 2; width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgba(0,0,0,.65); color: #fff; font-size: 1.3rem; }
+  .carousel .arr.l { left: -6px; } .carousel .arr.r { right: -6px; }
+  .dots { display: flex; justify-content: center; gap: 6px; margin: 2px 0 8px; } .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); } .dots i.on { background: var(--sun); }
   .mission { text-align: left; background: var(--panel-2); border: 0; padding: 0; box-shadow: 0 0 0 2px var(--line); }
   .mission img { width: 100%; display: block; image-rendering: pixelated; aspect-ratio: 2 / 1; object-fit: cover; }
   .mission div { padding: 8px 10px; } .mission b { display: block; } .mission small { color: var(--muted); }

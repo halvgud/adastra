@@ -153,7 +153,7 @@
   }
   async function loadArt() {
     const jobs = [load('bg_moon', ART + 'bg/moon.png'), load('bg_mars', ART + 'bg/mars.png'), load('panels', ART + 'props/solar-panels.png'), load('reactor', ART + 'props/reactor.png'), load('rover', ART + 'props/rover.png'), ...['soil-moon', 'soil-mars', 'tunnel', 'shaft', 'hatch'].map(n => load('base_' + n, ART + 'base/' + n + '.png')), load('south', ART + 'astronaut/Idle/rotations/south.png'), load('north', ART + 'astronaut/Idle/rotations/north.png')];
-    ROOMS.forEach(r => jobs.push(load('room_' + r.img, ART + 'rooms/' + r.img + '.png'), load('cell_' + r.id, ART + 'cells/' + r.id + '.png')));
+    ROOMS.forEach(r => jobs.push(load('room_' + r.img, ART + 'rooms/' + r.img + '.png'), load('cell_' + r.id, ART + 'cells/' + r.id + '.png'), load('cellm_' + r.id, ART + 'cells/' + r.id + '-mars.png')));
     Object.keys(MISSIONS).forEach(k => jobs.push(load('patch_' + k, patchSrc(k))));
     // Each animation is one strip of frames side by side (assets/pixellab/astronaut/strips/, made by tools/build_atlas.py)
     ['walk', 'idle', ...Object.keys(ACTS), ...['w', 'm'].flatMap(g => INDOOR.map(n => `in-${g}-${n}`))].forEach(a => jobs.push(load('strip_' + a, `${ART}astronaut/strips/${a}.png`)));
@@ -273,9 +273,10 @@
   }
   // Where resting astronauts sleep, in the shelter picture's own coordinates (384 x 240): the lower and upper bunk,
   // then sleeping bags on the floor. bag = true for the floor spots.
-  const BEDS = [[195, 167, false], [195, 109, false], [78, 214, true], [318, 214, true]];
+  const BEDS = [[104, 200, false], [286, 200, false], [104, 142, false], [286, 142, false]]; // zoomed shelter: the four bunks along the side walls
   const BEDS_CELL = [[80, 64, false], [80, 33, false], [32, 72, true], [100, 72, true]]; // the same, in the base's shelter cell (128 x 80)
-  function bedSpot(k, cell) { const B = cell ? BEDS_CELL : BEDS, i = S.jobs.filter((j, kk) => j === 'rest' && kk < k).length; return B[Math.min(i, B.length - 1)]; }
+  const BEDS_CELL_MARS = [[103, 54, false], [103, 33, false], [30, 72, true], [58, 72, true]]; // Mars shelter cell: two pods on the right
+  function bedSpot(k, cell) { const B = cell ? (S.world === 'mars' && IMG.cellm_shelter ? BEDS_CELL_MARS : BEDS_CELL) : BEDS, i = S.jobs.filter((j, kk) => j === 'rest' && kk < k).length; return B[Math.min(i, B.length - 1)]; }
   function drawSleeper(t, k, x, y, s, bag) { // lying on the back, head on the right, under a blanket; breathing and z's
     const fr = spr(k, 'idle', true)[0]; if (!fr) return; const br = still ? 0 : Math.sin(t / 700 + k) * 0.8 * s;
     if (bag) { ctx.fillStyle = '#2f5d8a'; ctx.fillRect(x - 32 * s, y - 9 * s, 56 * s, 18 * s); ctx.fillStyle = '#4a86c2'; ctx.fillRect(x - 32 * s, y - 9 * s, 56 * s, 4 * s); } // sleeping bag
@@ -286,6 +287,7 @@
   // The rooms are one base dug into the ground, seen as a cut-away from the side: soil around them, pressurised tunnels
   // between neighbours, ladder shafts between the two floors, and a hatch on the surface above the airlock.
   // Drawn before the rooms, so each tunnel's ends disappear into the rooms. Pieces: assets/pixellab/base/ (PixelLab).
+  const cellImg = r => IMG[(S && S.world === 'mars' ? 'cellm_' : 'cell_') + r.id] || IMG['cell_' + r.id] || IMG['room_' + r.img];
   function drawUnderground(moon) {
     const soil = IMG[moon ? 'base_soil-moon' : 'base_soil-mars'];
     if (soil) { ctx.save(); ctx.fillStyle = ctx.createPattern(soil, 'repeat'); ctx.translate(0, SKY); ctx.fillRect(0, 0, CW, CH - SKY); ctx.restore(); ctx.fillStyle = 'rgba(0,0,0,.38)'; ctx.fillRect(0, SKY, CW, CH - SKY); }
@@ -320,7 +322,7 @@
       if (!moon && s.clean < 0.9) { ctx.fillStyle = 'rgba(160,90,40,.55)'; ctx.fillRect(254, SKY - 58, 120, 30); } }
     if (!moon && IMG.reactor) ctx.drawImage(IMG.reactor, 182, SKY - 64);
     drawUnderground(moon);
-    ROOMS.forEach((r, i) => { const [x, y] = roomXY(i), im = IMG['cell_' + r.id] || IMG['room_' + r.img]; if (im) ctx.drawImage(im, x, y); // cells: one connected building
+    ROOMS.forEach((r, i) => { const [x, y] = roomXY(i), im = cellImg(r); if (im) ctx.drawImage(im, x, y); // cells: one connected building (its own look on Mars)
       if (i === 5 && IMG.cell_lab && IMG.base_shaft) { const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false; [RW + 22, 2 * RW + 22].forEach(lx => ctx.drawImage(IMG.base_shaft, lx - 7, SKY + RH - 12, 14, 24)); ctx.imageSmoothingEnabled = sm; } // ladder hatches between the two floors
       if (isOn(r) === false) smallTint(im, x, y, 'rgba(0,0,0,.6)'); // lights off: darken the room picture only
       if (r.id === 'battery') { const k = Math.max(0, s.batt) / s.cap; ctx.fillStyle = '#000'; ctx.fillRect(x + 108, y + 18, 12, 50);
@@ -397,7 +399,7 @@
     else { ctx.fillStyle = s.world === 'moon' ? '#0c1222' : '#1c0e08'; ctx.fillRect(0, 0, CW, CH); for (let i = 0; i < 40; i++) { ctx.fillStyle = '#2b3550'; ctx.fillRect((i * 97) % CW, (i * 53) % 36, 1, 1); }
       // around the zoomed room: the same base, 3x bigger (soil, tunnels, ladders, the neighbour rooms), a little darker
       ctx.save(); ctx.translate(-bx * 3, 40 - by * 3); ctx.scale(3, 3); const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;
-      drawUnderground(s.world === 'moon'); ROOMS.forEach((r2, i2) => { if (i2 === ri) return; const [x2, y2] = roomXY(i2), im2 = IMG['cell_' + r2.id] || IMG['room_' + r2.img]; if (im2) ctx.drawImage(im2, x2, y2); });
+      drawUnderground(s.world === 'moon'); ROOMS.forEach((r2, i2) => { if (i2 === ri) return; const [x2, y2] = roomXY(i2), im2 = cellImg(r2); if (im2) ctx.drawImage(im2, x2, y2); });
       ctx.imageSmoothingEnabled = sm; ctx.restore(); ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(0, 0, CW, CH); }
     if (im) ctx.drawImage(im, x, y, wd, ht);
     if (k < 1) return;
@@ -410,33 +412,47 @@
     if (r.id === 'greenhouse') { ctx.fillStyle = '#000'; ctx.fillRect(40, 286, 304, 14); ctx.fillStyle = '#009E73'; ctx.fillRect(42, 288, r0(300 * s.grow / N.growDays), 10); }
     if (r.id === 'shelter' && s.world === 'moon' && s.M.rad) { const gx = 344, gy = 64, gh = 190, max = 14, hh = r0(gh * Math.min(1, s.shelter / max)), sy = gy + gh - r0(gh * RU.safeSoilCm / max);
       ctx.fillStyle = '#000'; ctx.fillRect(gx, gy, 26, gh); ctx.fillStyle = '#8c8174'; ctx.fillRect(gx + 2, gy + gh - hh, 22, hh); ctx.fillStyle = '#F0E442'; ctx.fillRect(gx - 6, sy, 38, 2); text('safe', gx + 13, sy - 4, '#F0E442', 10); }
-    if (r.id === 'airlock') { const bg = IMG[s.world === 'moon' ? 'bg_moon' : 'bg_mars'], wx = 286, wy = 50, ww = 90, wh = 60; ctx.fillStyle = '#9aa0a6'; ctx.fillRect(wx - 3, wy - 3, ww + 6, wh + 6);
-      if (bg) ctx.drawImage(bg, 120, 40, 120, 80, wx, wy, ww, wh); const L = light(s); if (L < .9) { ctx.fillStyle = s.world === 'moon' ? `rgba(0,0,12,${(1 - L) * .75})` : `rgba(190,110,50,${(1 - L) * .7})`; ctx.fillRect(wx, wy, ww, wh); }
-      text('outside', wx + ww / 2, wy + wh + 13, '#aab4ca', 10); }
+    // (the airlock picture has its own hatch and window, so no code-drawn window here)
     if (r.id === 'oxygen' && s.broken) { ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillRect(92, 44, 200, 24); text('💥 RECYCLER BROKEN', 192, 61, '#ff7a3c', 15); } // at the top, so it never covers the lines below
     C.lines.forEach((ln, i) => text(ln, 192, (r.id === 'greenhouse' ? 318 : 306) + i * 18, '#fff', 13));
-    const here = S.jobs.map((j, kk) => j && roomFor(j) === r.id ? kk : -1).filter(kk => kk >= 0);
-    here.forEach((kk, i) => { if (S.jobs[kk] === 'rest' && !(t - (CHEER[kk] || -1e9) < 1260)) { const [ax, ay, bag] = bedSpot(kk); drawSleeper(t, kk, ax, 40 + ay, 1.5, bag); return; } // in a bunk or sleeping bag
+    const here = S.jobs.map((j, kk) => (j ? roomFor(j) === r.id : crewPos[kk].room === ri) ? kk : -1).filter(kk => kk >= 0); // workers, and free crew resting here
+    here.forEach((kk, i) => { if (S.jobs[kk] === 'rest' && !(t - (CHEER[kk] || -1e9) < 1260)) { const [ax, ay, bag] = bedSpot(kk); drawSleeper(t, kk, ax, ay, 0.8, bag); return; } // in a bunk or sleeping bag
       const indoor = r.id !== 'airlock', fr = spr(kk, 'idle', indoor), jt = t - (JUMP[kk] || -9999), cheer = !still && actFrame(kk, 'cheer', t, indoor);
       const hop = !cheer && jt < 500 && !still ? Math.sin(jt / 500 * Math.PI) * 26 : 0; // tapped: a happy jump (or a little hop)
-      if (!cheer && S.jobs[kk] === 'lab' && spr(kk, 'back', true).length) { atComputer(t, kk, hop); return; }
-      if (!cheer && S.jobs[kk] === 'tend' && indoor) { gardener(t, kk, hop); return; } // down the aisle, watering both sides
+      const rt = ROUTINES[S.jobs[kk] || 'free']; // move in depth along the room's aisle
+      if (!cheer && indoor && rt) { if (S.jobs[kk] === 'lab' && !still) labScreen(t); routine(t, kk, rt, (i - (here.length - 1) / 2) * 50, hop); return; }
       const busy = !still && JOBANIM[S.jobs[kk]] && actFrame(kk, JOBANIM[S.jobs[kk]], t, indoor);
       const f = cheer || busy || (fr.length ? fr[Math.floor(t / 260) % fr.length] : null); if (f) drawSprite(f, 70 + i * 90, 274 - hop, 1, 2); });
   }
-  // Gardening in the zoomed greenhouse (a picture with a middle aisle, seen from the door): walk away down the aisle, stop and
-  // water the bed on the right, then the left, go further, water again, and walk back toward you. Smaller when further away.
-  const AISLE = [[0, 'back', 0, 0.45], [2400, 'water', 0.45, 0.45, 1], [3700, 'water', 0.45, 0.45, -1], [5000, 'back', 0.45, 0.85],
-    [6500, 'water', 0.85, 0.85, 1], [7700, 'water', 0.85, 0.85, -1], [8900, 'front', 0.85, 0], [11900]]; // [start ms, what, depth from, depth to, facing]
-  function gardener(t, kk, hop) {
-    const P = AISLE[AISLE.length - 1][0], tt = still ? 2500 : (t + kk * 1700) % P; let i = 0; while (i < AISLE.length - 2 && tt >= AISLE[i + 1][0]) i++;
-    const [t0, what, d0, d1, face] = AISLE[i], t1 = AISLE[i + 1][0], k = (tt - t0) / (t1 - t0), d = d0 + (d1 - d0) * k;
-    const sc = 2 - 0.95 * d, foot = 280 - 78 * d, x = 192;
-    const frames = what === 'back' ? spr(kk, 'walkback', true) : what === 'front' ? spr(kk, 'walkfront', true) : spr(kk, 'water', true);
-    const f = frames.length ? (what === 'water' ? frames[Math.min(frames.length - 1, Math.floor((tt - t0) / 140))] : frames[Math.floor(t / 120) % frames.length]) : null;
-    if (f) drawSprite(f, x, foot - hop, what === 'water' ? face : 1, sc); }
+  // Zoomed rooms are seen from the door, down a middle aisle, so astronauts move in depth: away (back view, smaller),
+  // toward you (front view, bigger), and turn to the sides to work. A routine is a list of steps:
+  //   [start ms, what, depth from, depth to, facing, x offset from, x offset to]   (depth 0 = at the door, 1 = the far wall)
+  //   what: 'back' walk away · 'front' walk toward you · 'side' walk sideways · 'idle' · 'water' · 'repair' · 'type' (back view)
+  // The last entry only gives the loop length. Each astronaut starts at a different point of the loop.
+  const ROUTINES = {
+    tend: [[0, 'back', 0, 0.45], [2400, 'water', 0.45, 0.45, 1], [3700, 'water', 0.45, 0.45, -1], [5000, 'back', 0.45, 0.85],
+      [6500, 'water', 0.85, 0.85, 1], [7700, 'water', 0.85, 0.85, -1], [8900, 'front', 0.85, 0], [11900]],
+    lab: [[0, 'back', 0, 0.35], [1800, 'idle', 0.35, 0.35, -1], [3200, 'idle', 0.35, 0.35, 1], [4600, 'back', 0.35, 0.8],
+      [6400, 'type', 0.8, 0.8], [9800, 'front', 0.8, 0], [12600]],
+    fix: [[0, 'back', 0, 0.4], [2000, 'repair', 0.4, 0.4, 1], [4400, 'repair', 0.4, 0.4, -1], [6800, 'back', 0.4, 0.8],
+      [8400, 'type', 0.8, 0.8], [10400, 'front', 0.8, 0], [13200]],
+    free: [[0, 'idle', 0.1, 0.1, 1], [1800, 'back', 0.1, 0.6], [4200, 'side', 0.6, 0.6, 1, 0, 40], [5600, 'idle', 0.6, 0.6, -1, 40, 40],
+      [7000, 'side', 0.6, 0.6, -1, 40, -30], [8800, 'front', 0.6, 0.1, 1, -30, 0], [11200]],
+  };
+  function routine(t, kk, steps, xo, hop) {
+    const P = steps[steps.length - 1][0], tt = still ? 300 : (t + kk * 2300) % P; let i = 0; while (i < steps.length - 2 && tt >= steps[i + 1][0]) i++;
+    const [t0, what, d0, d1, face = 1, x0 = 0, x1 = x0] = steps[i], t1 = steps[i + 1][0], k = (tt - t0) / (t1 - t0), d = d0 + (d1 - d0) * k, x = 192 + xo * (1 - d) + x0 + (x1 - x0) * k;
+    const sc = 2 - 0.95 * d, foot = 280 - 78 * d;
+    const set = { back: 'walkback', front: 'walkfront', side: 'walk', idle: 'idle', water: 'water', repair: 'repair', type: 'type' }[what], fr = spr(kk, set, true);
+    if (!fr.length) return; const once = what === 'water' || what === 'repair';
+    const f = once ? fr[Math.floor((tt - t0) / 140) % fr.length] : fr[Math.floor(t / (what === 'idle' ? 260 : 120)) % fr.length];
+    drawSprite(f, x, foot - hop, what === 'side' || what === 'idle' || once ? face : 1, sc); }
+  function gardener(t, kk, hop) { routine(t, kk, ROUTINES.tend, 0, hop); }
   // Lab work: the astronaut stands at the big computer, seen from behind, typing. The screen scrolls data and keys flash.
-  const PC = { x: 182, foot: 272, scr: [152, 124, 60, 40], keysY: 196 }; // where the astronaut stands, the main screen (x, y, w, h) and the keyboard row, in the zoomed lab
+  const PC = { x: 192, foot: 232, scr: [141, 96, 102, 34], keysY: 196, s: 1.5 }; // where the astronaut stands, the main screen (x, y, w, h) and the keyboard row, in the zoomed lab
+  function labScreen(t) { const [sx, sy, sw, sh] = PC.scr; ctx.save(); ctx.beginPath(); ctx.rect(sx, sy, sw, sh); ctx.clip(); ctx.fillStyle = 'rgba(8,40,70,.35)'; ctx.fillRect(sx, sy, sw, sh);
+    for (let i = 0; i < 9; i++) { const yy = sy + sh - ((t / 40 + i * 6) % (sh + 6)), w = 8 + ((i * 17) % 34); ctx.fillStyle = ['#7fffd4', '#F0E442', '#bfe8ff'][i % 3]; ctx.fillRect(sx + 4 + (i % 3) * 30, yy | 0, w, 2); }
+    ctx.restore(); }
   function atComputer(t, kk, hop) {
     const [sx, sy, sw, sh] = PC.scr, run = !still;
     if (run) { ctx.save(); ctx.beginPath(); ctx.rect(sx, sy, sw, sh); ctx.clip(); ctx.fillStyle = 'rgba(8,40,70,.55)'; ctx.fillRect(sx, sy, sw, sh);
@@ -445,8 +461,7 @@
       ctx.restore(); }
     const tap = run ? Math.floor(t / 140) % 4 : 0, sway = run ? Math.round(Math.sin(t / 700)) : 0;
     const typing = spr(kk, 'type', true); // the typing animation (seen from behind, no helmet), or the still back view
-    if (typing.length) drawSprite(typing[run ? Math.floor(t / 120) % typing.length : 0], PC.x, PC.foot - hop, 1, 2); else drawSprite(spr(kk, 'back', true)[0], PC.x + sway, PC.foot - hop - (tap === 1 ? 1 : 0), 1, 2);
-    if (run && tap !== 3) { ctx.fillStyle = '#F0E442'; ctx.fillRect(PC.x + [-14, 10, -2][tap], PC.keysY, 3, 2); } // keys being pressed
+    if (typing.length) drawSprite(typing[run ? Math.floor(t / 120) % typing.length : 0], PC.x, PC.foot - hop, 1, PC.s); else drawSprite(spr(kk, 'back', true)[0], PC.x + sway, PC.foot - hop - (tap === 1 ? 1 : 0), 1, PC.s);
   }
   function drawFloats(t) { FLOAT = FLOAT.filter(f => t - f.t0 < 1800); FLOAT.forEach(f => { if (t < f.t0) return; const k = (t - f.t0) / 1800; ctx.globalAlpha = 1 - k * k;
     ctx.font = 'bold 15px ui-monospace, Consolas, monospace'; const half = ctx.measureText(f.txt).width / 2 + 4, x = Math.min(CW - half, Math.max(half, f.x)); // keep it on screen
@@ -981,26 +996,39 @@
   }
   const tune = id => { if (window.JAMT_MUSIC) JAMT_MUSIC.song(id); }; // js/music.js: a song for the menu, one per mission
   function missionMenu() { tune('menu');
-    popup(`<h2>🚀 Choose a mission, ${CMD()}</h2><p>Each mission teaches one real problem astronauts face.</p><div class="missions">${Object.entries(MISSIONS).map(([k, m]) =>
-      `<button class="mission" data-k="${k}"><img src="${ART}bg/${m.world}.png" alt=""><i class="aitag">AI</i>${PATCHES[k] ? `<img class="pt" src="${patchSrc(k)}" alt="patch earned">` : ''}<div><b>${m.world === 'moon' ? '🌙' : '🔴'} ${m.title}</b><small>${m.teach}${PATCHES[k] ? ` · 🏅 best ⭐ ${PATCHES[k].stars}` : ''}</small></div></button>`).join('')}</div>
+    popup(`<h2>🚀 Choose a mission, ${CMD()}</h2><p>Each mission teaches one real problem astronauts face. Swipe to see them all.</p><div class="carousel"><button class="arr l" aria-label="Previous mission">‹</button><button class="arr r" aria-label="Next mission">›</button><div class="missions">${Object.entries(MISSIONS).map(([k, m]) =>
+      `<button class="mission" data-k="${k}"><img src="${ART}bg/${m.world}.png" alt=""><i class="aitag">AI</i>${PATCHES[k] ? `<img class="pt" src="${patchSrc(k)}" alt="patch earned">` : ''}<div><b>${m.world === 'moon' ? '🌙' : '🔴'} ${m.title}</b><small>${m.teach}${PATCHES[k] ? ` · 🏅 best ⭐ ${PATCHES[k].stars}` : ''}</small></div></button>`).join('')}</div></div><div class="dots">${Object.keys(MISSIONS).map((k, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div>
       <button class="big" id="book"><span class="e">🏅</span><span>My mission patches<small>${Object.keys(PATCHES).filter(k => MISSIONS[k]).length} of ${Object.keys(MISSIONS).length} earned</small></span></button>
       <button class="big" id="playcode"><span class="e">🔢</span><span>Play a mission code<small>a friend's code gives the same days and the same surprises</small></span></button>
       <button class="big" id="settings"><span class="e">⚙️</span><span>Name & settings<small>${CMD()} · timers ${TIMERS ? 'on' : 'off'} · sound ${muted ? 'off' : 'on'} · music ${musicOn ? 'on' : 'off'}</small></span></button><span data-must></span>`);
     $('popcard').querySelectorAll('[data-k]').forEach(b => b.onclick = () => { SFX.go(); start(b.dataset.k); });
+    const row = $('popcard').querySelector('.missions'), dots = [...$('popcard').querySelectorAll('.dots i')], cardW = () => (row.querySelector('.mission') || {}).offsetWidth + 12 || 200;
+    $('popcard').querySelector('.arr.l').onclick = () => { SFX.tap(); row.scrollBy({ left: -cardW(), behavior: still ? 'auto' : 'smooth' }); };
+    $('popcard').querySelector('.arr.r').onclick = () => { SFX.tap(); row.scrollBy({ left: cardW(), behavior: still ? 'auto' : 'smooth' }); };
+    row.onscroll = () => { const i = Math.round(row.scrollLeft / cardW()); dots.forEach((d, k) => d.classList.toggle('on', k === i)); };
     $('settings').onclick = () => welcome(missionMenu); $('book').onclick = () => { SFX.tap(); patchBook(); }; $('playcode').onclick = () => { SFX.tap(); codePopup(); };
   }
   function codePopup() { // every mission has a 4-number code: the same code always gives the same mission (js/sim.js → fresh)
-    popup(`<h2>🔢 Play a mission code</h2>${mcSay('Did a friend send you a mission code? Type the 4 numbers, then tap the same mission. You get the same days and the same surprises. Who finds more ⭐?')}
-      <input type="text" id="mcode" inputmode="numeric" maxlength="4" placeholder="4 numbers, like 4821" autocomplete="off" aria-label="Mission code">
+    popup(`<h2>🔢 Play a mission code</h2>${mcSay('Did a friend send you a mission code? 1. Type the 4 numbers. 2. Tap the same mission. 3. Press Play. You get the same days and the same surprises. Who finds more ⭐?')}
+      <input type="text" id="mcode" inputmode="numeric" maxlength="4" placeholder="4 numbers, like 4821" autocomplete="off" aria-label="Mission code" enterkeyhint="go">
       <div class="tip" id="ctip"></div><div class="missions">${Object.entries(MISSIONS).map(([k, m]) =>
-      `<button class="mission" data-ck="${k}"><img src="${ART}bg/${m.world}.png" alt=""><div><b>${m.world === 'moon' ? '🌙' : '🔴'} ${m.title}</b><small>${m.teach}</small></div></button>`).join('')}</div>
+      `<button class="mission" data-ck="${k}" aria-pressed="false"><img src="${ART}bg/${m.world}.png" alt=""><div><b>${m.world === 'moon' ? '🌙' : '🔴'} ${m.title}</b><small>${m.teach}</small></div></button>`).join('')}</div>
+      <button class="big primary" id="cplay" disabled><span class="e">▶</span><span>Play this code<small id="cwhy">type the 4 numbers</small></span></button>
       <button class="big" id="cback"><span class="e">⬅</span><span>Back to missions</span></button><span data-must></span>`);
-    const box = $('mcode'), read = () => { const v = +box.value; return box.value.length === 4 && v >= 1000 ? v : null; };
-    box.oninput = () => { box.value = box.value.replace(/\D/g, '').slice(0, 4); };
-    $('popcard').querySelectorAll('[data-ck]').forEach(b => b.onclick = () => { const c = read();
-      if (!c) { const t = $('ctip'); t.textContent = 'First type the 4 numbers of the code (from 1000 to 9999).'; t.classList.add('show'); box.focus(); SFX.off(); return; }
-      SFX.go(); start(b.dataset.ck, c); });
+    const box = $('mcode'), read = () => { const v = +box.value; return box.value.length === 4 && v >= 1000 ? v : null; }; let pick = null;
+    const update = () => { const c = read(), why = !c ? 'type the 4 numbers (1000 to 9999)' : !pick ? 'now tap the mission' : `${MISSIONS[pick].title} · code ${c}`;
+      $('cplay').disabled = !(c && pick); $('cwhy').textContent = why; };
+    const go = () => { const c = read(); const t = $('ctip');
+      if (!c) { t.textContent = 'First type the 4 numbers of the code (from 1000 to 9999).'; t.classList.add('show'); box.focus(); SFX.off(); return; }
+      if (!pick) { t.textContent = 'Now tap the same mission your friend played.'; t.classList.add('show'); SFX.off(); return; }
+      SFX.go(); start(pick, c); };
+    box.oninput = () => { box.value = box.value.replace(/\D/g, '').slice(0, 4); update(); };
+    box.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); go(); } }; // Enter plays too
+    $('popcard').querySelectorAll('[data-ck]').forEach(b => b.onclick = () => { pick = b.dataset.ck; SFX.tap();
+      $('popcard').querySelectorAll('[data-ck]').forEach(x => { x.classList.toggle('sel', x === b); x.setAttribute('aria-pressed', x === b); }); update(); });
+    $('cplay').onclick = go;
     $('cback').onclick = () => { SFX.tap(); missionMenu(); };
+    setTimeout(() => box.focus(), 50); update();
   }
   function start(k, code) { tune(k); S = fresh(k, code || (1000 + Math.floor(Math.random() * 9000))); selected = null; HINT = null; hintSeen = {}; view = { mode: 'base', room: null, t0: 0 }; closeAll();
     let sunLine = '';
