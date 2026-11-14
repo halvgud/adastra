@@ -985,7 +985,7 @@
     g.fillStyle = '#0b1020'; g.fillRect(0, 0, 1080, 1080);
     if (IMG['bg_' + m.world]) g.drawImage(IMG['bg_' + m.world], -100, 0, 1280, 640);
     const fade = g.createLinearGradient(0, 360, 0, 640); fade.addColorStop(0, 'rgba(11,16,32,0)'); fade.addColorStop(1, '#0b1020'); g.fillStyle = fade; g.fillRect(0, 360, 1080, 281);
-    g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(0, 0, 1080, 72); say('JUNIOR ASTRONAUT MISSION TRAINER', 540, 48, 32, '#F0E442');
+    g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(0, 0, 1080, 72); say('AD ASTRA', 540, 50, 40, '#F0E442');
     g.fillStyle = 'rgba(240,228,66,.16)'; g.beginPath(); g.arc(540, 290, 214, 0, Math.PI * 2); g.fill();
     const earned = run.stars >= run.goal; // below the goal the patch is shown faded, as the next thing to earn
     if (IMG['patch_' + run.key]) { g.globalAlpha = earned ? 1 : 0.35; g.drawImage(IMG['patch_' + run.key], 348, 98, 384, 384); g.globalAlpha = 1; }
