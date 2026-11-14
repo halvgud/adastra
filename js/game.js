@@ -853,7 +853,7 @@
       musicOn = $('mus').checked; store.set('jamt-music', musicOn ? 'on' : 'off'); heard = true; music();
       GENDER = pick; store.set('jamt-gender', GENDER); setCrew(); if (S) hud(); SFX.go(); then(); };
     let pick = GENDER === 'man' ? 'man' : 'woman';
-    const showCrew = () => { const g = GENDER; GENDER = pick; setCrew(); $('crewline').textContent = `Your crew: you, ${CREW[1].name}, ${CREW[2].name} and ${CREW[3].name} (two women and two men).`; GENDER = g; setCrew(); };
+    const showCrew = () => { const g = GENDER; GENDER = pick; setCrew(); $('crewline').textContent = `Your crew: you, ${CREW[1].name}, ${CREW[2].name} and ${CREW[3].name}.`; GENDER = g; setCrew(); };
     $('popcard').querySelectorAll('[data-g]').forEach(b => b.onclick = () => { pick = b.dataset.g; SFX.tap();
       $('popcard').querySelectorAll('[data-g]').forEach(x => { const on = x.dataset.g === pick; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); }); showCrew(); });
     showCrew();
