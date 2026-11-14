@@ -164,7 +164,34 @@
   let S = null, view = { mode: 'base', room: null, t0: 0 }, selected = null, FX = null, FLOAT = [], PREV = null, MOODS = {}, BANNER = null, SUMMARY = null, SUMMARY_NEXT = null;
   const SUNPOS = () => S && S.world === 'mars' ? [180, 54, 15] : [26, 96, 10];
   function crewHome() { const n = {}; CREW.forEach((c, k) => { const j = S.jobs[k], ri = ROOMS.findIndex(r => r.id === (j ? roomFor(j) : 'shelter')); n[ri] = (n[ri] || 0) + 1;
-    const p = crewPos[k]; if (p.room !== ri) { p.room = ri; p.x = (ri % 3) * RW + 6; } p.tx = (ri % 3) * RW + 22 + (n[ri] - 1) * 26; }); }
+    const p = crewPos[k]; if (p.room !== ri) { p.room = ri; p.x = (ri % 3) * RW + 6; } p.tx = p.home = (ri % 3) * RW + 22 + (n[ri] - 1) * 26; p.next = 0; }); }
+  // ---------- the crew and the world move on their own ----------
+  const OUTSIDE = { trip: 'samples', clean: 'panels', regolith: 'soil' }; // jobs done out on the surface
+  function drawOutside(t, k, p, job) {
+    const zone = job === 'clean' ? [258, 370] : job === 'regolith' ? [20, 150] : [20, 236], foot = SKY - 5;
+    if (p.ox === undefined || p.ojob !== job) { p.ox = zone[0] + 10 + k * 14; p.otx = p.ox; p.ojob = job; p.onext = 0; }
+    if (Math.abs(p.otx - p.ox) < 1 && t > p.onext) { p.otx = zone[0] + Math.random() * (zone[1] - zone[0]); p.onext = t + 1600 + Math.random() * 2600; }
+    const dx = p.otx - p.ox, moving = Math.abs(dx) > 1; if (moving) { p.ox += Math.sign(dx) * 0.55; p.ofacing = Math.sign(dx); }
+    const fr = (moving ? SPR.walk[k] : SPR.idle[k]) || []; if (!fr.length) return;
+    const crouch = !moving ? Math.max(0, Math.sin(t / 260 + k)) * 4 : 0; // bending down to pick up a sample, wipe, or dig
+    drawSprite(fr[Math.floor(t / (moving ? 120 : 260)) % fr.length], p.ox, foot + crouch, p.ofacing || 1, 0.7);
+    if (k === 0) text('★', p.ox, foot - 44 + crouch, '#ff9a3c', 8);
+    if (!moving && crouch > 3) { const hx = p.ox + (p.ofacing || 1) * 10; // what their hands do
+      if (job === 'trip') { ctx.fillStyle = '#F0E442'; ctx.fillRect(hx, foot - 4, 2, 2); ctx.fillRect(hx - 2, foot - 2, 1, 1); ctx.fillRect(hx + 3, foot - 3, 1, 1); }
+      if (job === 'clean') { ctx.fillStyle = 'rgba(214,150,96,.8)'; for (let i = 0; i < 3; i++) ctx.fillRect(hx + i * 3, foot - 26 - (t / 40 + i * 5) % 10, 2, 2); }
+      if (job === 'regolith') { ctx.fillStyle = S.world === 'moon' ? '#b9b2a6' : '#c27a4c'; for (let i = 0; i < 4; i++) ctx.fillRect(hx + i * 2, foot - 2 - ((t / 30 + i * 4) % 12), 2, 2); } }
+  }
+  function jobFx(t, k, job, x, y) { // a hint of what each astronaut is doing inside
+    if (job === 'lab') { if (Math.floor(t / 300 + k) % 2) { ctx.fillStyle = '#56B4E9'; ctx.fillRect(x - 3, y, 6, 4); } }
+    if (job === 'tend') for (let i = 0; i < 3; i++) { const ph = ((t / 700) + i / 3) % 1; ctx.fillStyle = `rgba(120,200,255,${1 - ph})`; ctx.fillRect(x + i * 2, y + 6 + ph * 18, 1, 3); }
+    if (job === 'fix' && Math.sin(t / 90 + k) > 0.6) { ctx.fillStyle = '#ffe76a'; ctx.fillRect(x, y + 4, 2, 2); ctx.fillRect(x + 3, y + 1, 1, 1); ctx.fillRect(x - 2, y + 7, 1, 1); }
+  }
+  function drawRover(t, moon) { // a small rover crosses the plain now and then
+    const ph = (t / 34000) % 1; if (ph > 0.55) return; const k = ph / 0.55, x = -30 + k * (CW + 60), y = SKY - 22 + Math.sin(k * 40) * 0.6;
+    ctx.fillStyle = moon ? '#d8dce4' : '#e8e2d6'; ctx.fillRect(x | 0, y | 0, 16, 5); ctx.fillStyle = '#56B4E9'; ctx.fillRect((x + 3) | 0, (y - 3) | 0, 5, 3);
+    ctx.fillStyle = '#9aa0a6'; ctx.fillRect((x + 12) | 0, (y - 6) | 0, 1, 6); ctx.fillStyle = '#F0E442'; ctx.fillRect((x + 11) | 0, (y - 7) | 0, 3, 1);
+    ctx.fillStyle = '#222'; [1, 6, 11].forEach(w => ctx.fillRect((x + w) | 0, (y + 5) | 0, 4, 3));
+    if (!moon) { ctx.fillStyle = 'rgba(214,150,96,.5)'; ctx.fillRect((x - 6) | 0, (y + 4) | 0, 5, 2); } }
   const isOn = r => r.sw ? (r.sw === 'lab' ? S.sw.lab && !S.sw.save : S.sw[r.sw]) : null;
   function disc(x, y, r, fill) { ctx.fillStyle = fill; for (let yy = -r; yy <= r; yy++) for (let xx = -r; xx <= r; xx++) if (xx * xx + yy * yy <= r * r + r) ctx.fillRect(x + xx, y + yy, 1, 1); }
   function drawSun(x, y, r) {
@@ -217,10 +244,24 @@
       ctx.fillStyle = '#5b4a1a'; ctx.fillRect(381, SKY - 8, 2, 120); ctx.fillRect(256, 271, 128, 2);
       for (let i = 0; i < cnt; i++) { const ph = ((t / (900 - k * 500)) + i / cnt) % 1;
         if (n >= 0) { ctx.fillStyle = '#F0E442'; ctx.fillRect(380, SKY - 8 + ph * 120, 4, 4); } else { ctx.fillStyle = '#ff7a3c'; ctx.fillRect(384 - ph * 384, 270, 4, 4); } } }
-    CREW.forEach((c, k) => { const p = crewPos[k], [, ry] = roomXY(p.room), dx = p.tx - p.x, moving = Math.abs(dx) > 1 && !still;
-      if (moving) { p.x += Math.sign(dx) * Math.min(Math.abs(dx), 1.3); p.facing = Math.sign(dx); } else p.x = p.tx;
+    if (!still) drawRover(t, moon);
+    CREW.forEach((c, k) => { const p = crewPos[k], [rx, ry] = roomXY(p.room), job = S.jobs[k];
+      // jobs done outside: the astronaut walks on the surface (science trip, cleaning panels, digging soil)
+      if (!still && OUTSIDE[job]) { drawOutside(t, k, p, job); return; }
+      // wander a little around their spot, then pause (not while resting)
+      if (!still && job !== 'rest' && Math.abs(p.tx - p.x) <= 1 && t > (p.next || 0)) { const home = p.home ?? p.tx, range = job ? 14 : 34;
+        p.tx = Math.max(rx + 14, Math.min(rx + RW - 14, home + (Math.random() * 2 - 1) * range)); p.next = t + 1800 + Math.random() * 3500; }
+      const dx = p.tx - p.x, moving = Math.abs(dx) > 1 && !still;
+      if (moving) { p.x += Math.sign(dx) * Math.min(Math.abs(dx), job ? 0.6 : 0.9); p.facing = Math.sign(dx); } else p.x = p.tx;
       const md = MOODS[k], live = md && t >= md.t0 && t - md.t0 < 4200, hop = live && md.hop && !still && t - md.t0 < 1800 ? Math.abs(Math.sin((t - md.t0) / 110)) * 7 : 0;
-      const fr = (moving ? SPR.walk[k] : SPR.idle[k]) || []; if (!fr.length) return; drawSprite(fr[Math.floor(t / (moving ? 110 : 260)) % fr.length], p.x, ry + RH - 9 - hop, p.facing, 1);
+      const fr = (moving ? SPR.walk[k] : SPR.idle[k]) || []; if (!fr.length) return;
+      if (job === 'rest' && !still) { // lying down for a nap
+        const lx = Math.max(rx + 40, Math.min(rx + RW - 40, p.x)), breathe = Math.sin(t / 700 + k) * 0.6; p.x = lx; ctx.save(); ctx.translate(lx, ry + RH - 22 + breathe); ctx.rotate(-Math.PI / 2); ctx.drawImage(fr[0], -30, -30, 60, 60); ctx.restore();
+        const zph = (t / 1600 + k * 0.3) % 1; ctx.globalAlpha = 1 - zph; text('z', p.x + 12 + zph * 10, ry + RH - 40 - zph * 22, '#cfe3ff', 9 + zph * 6); ctx.globalAlpha = 1;
+        if (k === 0) text('★', p.x - 22, ry + RH - 34, '#ff9a3c', 9); return; }
+      const work = !moving && !still && job ? Math.abs(Math.sin(t / 180 + k)) * 1.5 : 0; // a small busy bob while working
+      drawSprite(fr[Math.floor(t / (moving ? 110 : 260)) % fr.length], p.x, ry + RH - 9 - hop - work, p.facing, 1);
+      if (!moving && !still) jobFx(t, k, job, p.x + p.facing * 14, ry + RH - 34);
       if (k === 0) text('★', p.x, ry + 16 - hop, '#ff9a3c', 9); if (selected === k) { ctx.fillStyle = '#F0E442'; ctx.fillRect(p.x - 3, ry + 4, 6, 6); }
       if (live) { const by = ry + 2 - hop; ctx.fillStyle = '#fff'; ctx.fillRect(p.x - 9, by - 13, 18, 15); ctx.fillRect(p.x - 2, by + 2, 4, 3); ctx.fillStyle = '#000'; ctx.fillRect(p.x - 9, by - 13, 18, 1);
         ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(md.e, p.x, by - 2); ctx.textAlign = 'left'; } });
