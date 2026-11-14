@@ -151,7 +151,7 @@
   // Mold comes more often as the basket fills. Plants keep ripening the whole time, so it can always be won.
   const GARDEN = 'assets/pixellab/garden/';
   ['lettuce', 'sprout', 'young', 'wilt', 'mold', 'drop'].forEach(n => { new Image().src = GARDEN + n + '.png'; });
-  ['cardback', 'solar', 'dust', 'steel', 'sandbag', 'ground-moon', 'ground-mars', 'rock-basalt', 'rock-bright', 'rock-ice', 'bin', 'valve', 'cabin'].forEach(n => { new Image().src = 'assets/pixellab/mg/' + n + '.png'; }); // loaded early, so the puzzle never shows empty pots
+  ['cardback', 'solar', 'dust', 'steel', 'sandbag', 'ground-moon', 'ground-mars', 'rock-basalt', 'rock-bright', 'rock-ice', 'bin', 'bucket', 'valve', 'cabin'].forEach(n => { new Image().src = 'assets/pixellab/mg/' + n + '.png'; }); // loaded early, so the puzzle never shows empty pots
   function tend(el, o) {
     const R = o.rng, N = 12, GOAL = 12, WILT = 6500, MAXRIPE = 3, PERFECT = 1100, MAXMISS = 5, GROW = () => 1 / (11000 + R() * 7000);
     const P = Array.from({ length: N }, () => ({ g: R() * 0.45, speed: GROW(), water: 0.45 + R() * 0.55, bug: 0, ripe: 0, wilt: 0, pop: 0 }));
@@ -242,19 +242,35 @@
       { id: 'ice', name: 'Ice', icon: '🧊', clues: ['Melts if it gets warm!', 'Found in dark craters that never see the Sun', 'Clear and cold: it can become drinking water'], col: '#bfe8ff' }];
     let n = 0, cur = null, last = -1, over = false;
     const pic = k => 'assets/pixellab/mg/rock-' + k.id + '.png'; // PixelLab samples
-    el.innerHTML = `<p class="mgq">Sorted: <b id="mgn">0</b>/${GOAL}</p><div class="sorter"><div class="sample" id="mgs"><span class="tray"><img class="rock" alt=""></span><span class="clue"><small>Clue</small><span id="mgc"></span></span></div>
-      <div class="bins">${KINDS.map((k, i) => `<button class="bin" data-i="${i}"><span class="pile"></span><img class="crate" src="${'assets/pixellab/mg/bin.png'}" alt=""><img class="tag" src="${pic(k)}" alt=""><span class="nm">${k.name}</span></button>`).join('')}</div></div>`;
+    el.innerHTML = `<p class="mgq">Sorted: <b id="mgn">0</b>/${GOAL}</p><div class="sorter"><div class="sample" id="mgs"><span class="tray"><img class="rock" alt="" draggable="false"></span><span class="clue"><small>Clue · drag the sample into a bucket</small><span id="mgc"></span></span></div>
+      <div class="bins">${KINDS.map((k, i) => `<button class="bin k-${k.id}" data-i="${i}"><span class="nm">${k.name}</span><span class="bk"><img class="bucket" src="assets/pixellab/mg/bucket.png" alt="" draggable="false"><span class="pile"></span><span class="plate"><img src="${pic(k)}" alt=""></span></span></button>`).join('')}</div></div>`;
     const next = () => { let i; do i = Math.floor(R() * 3); while (i === last && R() < 0.6); last = i; const k = KINDS[i]; cur = i;
       el.querySelector('#mgc').textContent = k.clues[Math.floor(R() * k.clues.length)]; el.querySelector('.sample .rock').src = pic(k);
       const s = el.querySelector('#mgs'); s.classList.remove('in'); void s.offsetWidth; s.classList.add('in'); };
-    const fly = b => { const from = el.querySelector('.sample .rock').getBoundingClientRect(), to = b.querySelector('.crate').getBoundingClientRect(), f = new Image(); // the sample flies into its crate
-      f.src = el.querySelector('.sample .rock').src; f.className = 'flyrock'; f.style.left = from.left + 'px'; f.style.top = from.top + 'px'; document.body.appendChild(f);
-      requestAnimationFrame(() => { f.style.transform = `translate(${to.left + to.width / 2 - from.left - 22}px, ${to.top - from.top - 10}px) scale(.6) rotate(200deg)`; f.style.opacity = '.4'; });
-      setTimeout(() => { f.remove(); const p = b.querySelector('.pile'); if (p.children.length < 6) { const r = new Image(); r.src = f.src; r.style.left = (8 + p.children.length * 13) % 60 + '%'; p.appendChild(r); } b.classList.remove('got'); void b.offsetWidth; b.classList.add('got'); }, 380); };
-    el.querySelectorAll('.bin').forEach(b => b.onclick = () => { if (over) return; const i = +b.dataset.i;
-      if (i !== cur) { b.classList.remove('no'); void b.offsetWidth; b.classList.add('no'); mistakes(o, 3, 'Not that one. Read the clue again!'); return; }
-      o.tap(); fly(b); n += 1; el.querySelector('#mgn').textContent = n; if (n >= GOAL) { over = true; setTimeout(o.win, 600); return; } setTimeout(() => { if (!over) next(); }, 250); });
-    const lose = o.lose; o.lose = m => { over = true; lose(m); };
+    // the sample drops into the bucket: it falls in from above and lands on the pile inside
+    const drop = (b, from) => { const bk = b.querySelector('.bk').getBoundingClientRect(), f = new Image(); f.src = el.querySelector('.sample .rock').src; f.className = 'flyrock';
+      f.style.left = from.left + 'px'; f.style.top = from.top + 'px'; document.body.appendChild(f);
+      requestAnimationFrame(() => { f.style.transform = `translate(${bk.left + bk.width / 2 - from.left - 24}px, ${bk.top + 4 - from.top}px) scale(.5) rotate(160deg)`; });
+      setTimeout(() => { f.remove(); const p = b.querySelector('.pile'), c = p.children.length; if (c < 7) { const r = new Image(); r.src = f.src; r.style.left = (14 + (c * 23) % 60) + '%'; r.style.bottom = (Math.floor(c / 3) * 5) + 'px'; r.style.transform = `rotate(${(c * 47) % 60 - 30}deg)`; p.appendChild(r); }
+        b.classList.remove('got'); void b.offsetWidth; b.classList.add('got'); }, 360); };
+    const choose = (b, from) => { if (over) return; const i = +b.dataset.i;
+      if (i !== cur) { b.classList.remove('no'); void b.offsetWidth; b.classList.add('no'); mistakes(o, 3, 'Not that one. Read the clue again!'); return false; }
+      o.tap(); drop(b, from || el.querySelector('.sample .rock').getBoundingClientRect()); n += 1; el.querySelector('#mgn').textContent = n;
+      if (n >= GOAL) { over = true; setTimeout(o.win, 650); return true; } setTimeout(() => { if (!over) next(); }, 300); return true; };
+    el.querySelectorAll('.bin').forEach(b => b.onclick = () => choose(b));
+    // drag and drop: pick the sample up from the tray and let go over a bucket
+    const rock = el.querySelector('.sample .rock'); let drag = null;
+    const binAt = (x, y) => { const e = document.elementFromPoint(x, y); return e && e.closest && el.contains(e) ? e.closest('.bin') : null; };
+    rock.onpointerdown = e => { if (over) return; e.preventDefault(); const r = rock.getBoundingClientRect(), g = new Image(); g.src = rock.src; g.className = 'dragrock'; document.body.appendChild(g);
+      drag = { g, dx: e.clientX - r.left, dy: e.clientY - r.top, hover: null }; rock.style.visibility = 'hidden'; move(e); };
+    const move = e => { if (!drag) return; drag.g.style.left = (e.clientX - drag.dx) + 'px'; drag.g.style.top = (e.clientY - drag.dy) + 'px';
+      const b = binAt(e.clientX, e.clientY); if (b !== drag.hover) { if (drag.hover) drag.hover.classList.remove('hov'); if (b) b.classList.add('hov'); drag.hover = b; } };
+    const up = e => { if (!drag) return; const d = drag; drag = null; d.g.remove(); rock.style.visibility = ''; if (d.hover) d.hover.classList.remove('hov');
+      const b = binAt(e.clientX, e.clientY); if (b) choose(b, { left: e.clientX - d.dx, top: e.clientY - d.dy }); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+    const off = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    const win0 = o.win; o.win = (...a) => { off(); win0(...a); };
+    const lose = o.lose; o.lose = m => { over = true; off(); lose(m); };
     next();
   }
 
