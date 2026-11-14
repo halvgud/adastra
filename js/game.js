@@ -88,6 +88,12 @@
   // ---------- content lives in data/*.js; the simulation lives in js/sim.js ----------
   const N = DATA.model, RU = N.rules, MISSIONS = DATA.missions, EVENTS = DATA.events, ROOMS = T.rooms, CREW = T.crew, JOB = T.jobs;
   const crewName = k => k === 0 ? esc(NAME || 'Rookie') : CREW[k].name;
+  // Two women and two men: the commander's choice decides who else is on the crew (data/text.js → crewNames).
+  let GENDER = store.get('jamt-gender') || '';
+  function setCrew() { const W = (T.crewNames || {}).woman || ['Ana', 'Mia'], M = (T.crewNames || {}).man || ['Leo', 'Max'];
+    const others = GENDER === 'man' ? [W[0], W[1], M[0]] : [W[1], M[0], M[1]]; // a woman commander: 1 more woman + 2 men; a man: 2 women + 1 more man
+    others.forEach((n, i) => { if (CREW[i + 1]) CREW[i + 1].name = n; }); }
+  setCrew();
   const roomFor = j => (JOB[j] || [])[2] || 'shelter';
   const { fresh, step, light, evToday } = SIM;
   let sunMult = RU.sun.QUIET.mult, sunWord = 'QUIET', sunInfo = null;
@@ -267,9 +273,12 @@
     if (r.id === 'oxygen' && s.broken) text('💥 RECYCLER BROKEN', 192, 300, '#ff7a3c', 15);
     C.lines.forEach((ln, i) => text(ln, 192, (r.id === 'greenhouse' ? 318 : 306) + i * 18, '#fff', 13));
     const here = S.jobs.map((j, kk) => j && roomFor(j) === r.id ? kk : -1).filter(kk => kk >= 0);
-    here.forEach((kk, i) => { const fr = SPR.idle[kk] || []; if (fr.length) drawSprite(fr[Math.floor(t / 260) % fr.length], 70 + i * 90, 274, 1, 2); });
+    here.forEach((kk, i) => { const fr = SPR.idle[kk] || [], jt = t - (JUMP[kk] || -9999), hop = jt < 500 && !still ? Math.sin(jt / 500 * Math.PI) * 26 : 0; // tapped: a little jump
+      if (fr.length) drawSprite(fr[Math.floor(t / 260) % fr.length], 70 + i * 90, 274 - hop, 1, 2); });
   }
-  function drawFloats(t) { FLOAT = FLOAT.filter(f => t - f.t0 < 1800); FLOAT.forEach(f => { if (t < f.t0) return; const k = (t - f.t0) / 1800; ctx.globalAlpha = 1 - k * k; text(f.txt, f.x, f.y - k * 34, f.col, 15); ctx.globalAlpha = 1; }); }
+  function drawFloats(t) { FLOAT = FLOAT.filter(f => t - f.t0 < 1800); FLOAT.forEach(f => { if (t < f.t0) return; const k = (t - f.t0) / 1800; ctx.globalAlpha = 1 - k * k;
+    ctx.font = 'bold 15px ui-monospace, Consolas, monospace'; const half = ctx.measureText(f.txt).width / 2 + 4, x = Math.min(CW - half, Math.max(half, f.x)); // keep it on screen
+    text(f.txt, x, f.y - k * 34, f.col, 15); ctx.globalAlpha = 1; }); }
   function drawFX(t) { if (!FX || still) return; const k = (t - FX.t0) / FX.dur; if (k >= 1) { FX = null; return; }
     if (FX.kind === 'night') { ctx.fillStyle = `rgba(0,0,20,${Math.sin(k * Math.PI) * .75})`; ctx.fillRect(0, 0, CW, CH); }
     if (FX.kind === 'storm') for (let i = 0; i < 90; i++) { const x = (i * 41 + k * 900) % (CW + 100) - 50, y = (i * 67 + k * 600) % CH; ctx.fillStyle = i % 3 ? '#ffe76a' : '#ff6ad5'; ctx.fillRect(x | 0, y | 0, 3, 1); ctx.fillRect((x + 3) | 0, (y + 1) | 0, 2, 1); }
@@ -280,7 +289,28 @@
   function aiMark() { // visible watermark on the scene itself, so screenshots and videos carry it (Space Apps rule for AI images)
     ctx.font = 'bold 8px ui-monospace, Consolas, monospace'; const t = 'AI', w = ctx.measureText(t).width + 8;
     ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(CW - w - 2, CH - 15, w, 13); ctx.fillStyle = '#fff'; ctx.fillText(t, CW - w + 2, CH - 5); }
-  function loop(t) { if (S) { if (view.mode === 'room') drawRoom(t, view.room, still ? 1 : Math.min(1, (t - view.t0) / 280)); else { drawBase(t); drawBanner(t); } drawFloats(t); drawFX(t); aiMark(); } requestAnimationFrame(loop); }
+  function loop(t) { if (S) { if (view.mode === 'room') drawRoom(t, view.room, still ? 1 : Math.min(1, (t - view.t0) / 280)); else { drawBase(t); drawBanner(t); } drawPokes(t); drawFloats(t); drawFX(t); aiMark(); } requestAnimationFrame(loop); }
+
+  // ---------- tap the scene: things react (a small burst, a sound, sometimes a real number) ----------
+  let POKES = []; const JUMP = {};
+  const POKE_KIND = { oxygen: 'bubble', greenhouse: 'leaf', lab: 'spark', battery: 'zap', shelter: 'dust', airlock: 'star' };
+  function poke(x, y, kind) { POKES.push({ x, y, kind, t0: performance.now() }); if (POKES.length > 12) POKES.shift(); }
+  function drawPokes(t) { POKES = POKES.filter(p => t - p.t0 < 900); POKES.forEach(p => { const k = (t - p.t0) / 900;
+    for (let i = 0; i < 10; i++) { const a = i / 10 * 6.283 + p.t0, d = 6 + k * 34, x = p.x + Math.cos(a) * d, y = p.y + Math.sin(a) * d * (p.kind === 'bubble' || p.kind === 'leaf' ? 0.6 : 1) - (p.kind === 'bubble' ? k * 30 : 0);
+      ctx.globalAlpha = 1 - k; ctx.fillStyle = { bubble: '#bfe8ff', leaf: '#7ee08a', spark: '#F0E442', zap: '#fff38a', dust: '#b9aa96', star: '#ffffff' }[p.kind] || '#fff';
+      if (p.kind === 'bubble') { ctx.fillRect(x - 1, y - 2, 3, 1); ctx.fillRect(x - 2, y - 1, 1, 3); ctx.fillRect(x + 2, y - 1, 1, 3); ctx.fillRect(x - 1, y + 2, 3, 1); }
+      else ctx.fillRect(x | 0, y | 0, p.kind === 'leaf' ? 3 : 2, p.kind === 'zap' ? 4 : 2); } ctx.globalAlpha = 1; }); }
+  cv.addEventListener('pointerdown', e => { if (!S) return; const b = cv.getBoundingClientRect(), x = (e.clientX - b.left) * CW / b.width, y = (e.clientY - b.top) * CH / b.height;
+    if (view.mode === 'room') { const r = ROOMS[view.room], here = S.jobs.map((j, k) => j && roomFor(j) === r.id ? k : -1).filter(k => k >= 0);
+      const hit = here.findIndex((k, i) => Math.abs(x - (70 + i * 90)) < 34 && y > 160 && y < 290);
+      if (hit >= 0) { const k = here[hit]; JUMP[k] = performance.now(); const L = T.crewLines || ['Hi!']; FLOAT.push({ txt: `${k === 0 ? 'Me' : CREW[k].name}: ${L[Math.floor(Math.random() * L.length)]}`, x: 70 + hit * 90, y: 150, col: '#fff', t0: performance.now() }); beep([[660, .05], [880, .07]], 'square', .04); return; }
+      if (y > 40 && y < 280) { poke(x, y, POKE_KIND[r.id] || 'star'); beep([[500 + Math.random() * 500, .05]], 'triangle', .05); } return; }
+    // base view: the sky part of the scene (the rooms below have their own buttons)
+    const moon = S.world === 'moon';
+    if (moon && Math.hypot(x - 186, y - 59) < 16) { FLOAT.push({ txt: '🌍 Earth · radio takes 1.3 s', x: 192, y: 92, col: '#56B4E9', t0: performance.now() }); poke(186, 59, 'star'); beep([[523, .06], [659, .08]], 'triangle', .05); return; }
+    if (x >= 250 && y >= SKY - 64 && y <= SKY && PREV) { const L = light(S); FLOAT.push({ txt: `☀️ panels: ${r0(L * 100)} % sunlight${S.world === 'mars' && S.sunFactor ? ` · Sun ${r0(S.sunFactor * 100)} %` : ''}`, x: 300, y: SKY - 74, col: '#F0E442', t0: performance.now() }); poke(x, y, 'zap'); beep([[880, .05]], 'square', .04); return; }
+    if (!moon && x >= 182 && x <= 246 && y >= SKY - 64 && y <= SKY) { FLOAT.push({ txt: `⚛️ nuclear unit: ${N.mars.kiloKWh} kWh a sol, day and night`, x: 214, y: SKY - 74, col: '#3ddc97', t0: performance.now() }); poke(x, y, 'spark'); beep([[330, .08]], 'triangle', .05); return; }
+    if (y < SKY) { poke(x, y, moon ? 'star' : 'dust'); beep([[1200 + Math.random() * 600, .03]], 'sine', .04); } });
 
   // ---------- what each room means right now (shown when you zoom in) ----------
   const FACTS = T.facts; // data/text.js
@@ -742,13 +772,23 @@
     popup(`<h2>👩‍🚀 Welcome to your base!</h2>${mcSay(`${MCNAME ? `Hi! I'm ${esc(MCNAME)}, from Mission Control.` : "Hi! I'm Mission Control."} I'll help you run a base on the Moon or Mars. What should I call you, Commander?`)}
       <input type="text" id="nm" maxlength="14" placeholder="Your first name or a nickname" autocomplete="off" aria-label="Your name" value="${esc(NAME)}">
       <div class="src">🔒 Your name stays on this device. We never send it anywhere.</div>
+      <p class="mgq" style="text-align:left">Your commander is a…</p><div class="gender" role="radiogroup" aria-label="Your commander is a woman or a man">
+        <button class="big ${GENDER !== 'man' ? 'on' : ''}" data-g="woman" role="radio" aria-checked="${GENDER !== 'man'}"><span class="e">👩‍🚀</span><span>Woman</span></button>
+        <button class="big ${GENDER === 'man' ? 'on' : ''}" data-g="man" role="radio" aria-checked="${GENDER === 'man'}"><span class="e">👨‍🚀</span><span>Man</span></button></div>
+      <p class="src" id="crewline"></p>
       <label><input type="checkbox" id="tm" ${TIMERS ? 'checked' : ''}> ⏱ Quick-decision timers (turn off for more time)</label>
       <label><input type="checkbox" id="snd" ${muted ? '' : 'checked'}> 🔊 Sounds</label>
       <label><input type="checkbox" id="mus" ${musicOn ? 'checked' : ''}> 🎵 Music</label>
       <button class="big primary" id="go"><span class="e">🚀</span><span>Let's go!</span></button><span data-must></span>`);
     const go = () => { const v = $('nm').value.replace(/[^\p{L}\p{N} '-]/gu, '').trim().slice(0, 14); NAME = v || COMMANDER.name || 'Rookie'; TIMERS = $('tm').checked; muted = !$('snd').checked;
       store.set('jamt-name', v === COMMANDER.name ? '' : v); store.set('jamt-welcomed', '1'); store.set('jamt-timers', TIMERS ? 'on' : 'off'); store.set('jamt-mute', muted ? '1' : '0');
-      musicOn = $('mus').checked; store.set('jamt-music', musicOn ? 'on' : 'off'); heard = true; music(); SFX.go(); then(); };
+      musicOn = $('mus').checked; store.set('jamt-music', musicOn ? 'on' : 'off'); heard = true; music();
+      GENDER = pick; store.set('jamt-gender', GENDER); setCrew(); if (S) hud(); SFX.go(); then(); };
+    let pick = GENDER === 'man' ? 'man' : 'woman';
+    const showCrew = () => { const g = GENDER; GENDER = pick; setCrew(); $('crewline').textContent = `Your crew: you, ${CREW[1].name}, ${CREW[2].name} and ${CREW[3].name} (two women and two men).`; GENDER = g; setCrew(); };
+    $('popcard').querySelectorAll('[data-g]').forEach(b => b.onclick = () => { pick = b.dataset.g; SFX.tap();
+      $('popcard').querySelectorAll('[data-g]').forEach(x => { const on = x.dataset.g === pick; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); }); showCrew(); });
+    showCrew();
     $('go').onclick = go; $('nm').onkeydown = e => { if (e.key === 'Enter') go(); };
   }
   const tune = id => { if (window.JAMT_MUSIC) JAMT_MUSIC.song(id); }; // js/music.js: a song for the menu, one per mission

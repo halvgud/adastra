@@ -49,7 +49,8 @@
   .forecast .d small { font: .62rem ui-monospace, monospace; color: var(--muted); }
 
   .stage { position: relative; box-shadow: 0 0 0 3px var(--line); background: #000; touch-action: manipulation; }
-  canvas#base { display: block; width: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
+  canvas#base { display: block; width: 100%; image-rendering: pixelated; image-rendering: crisp-edges; cursor: pointer; touch-action: manipulation; }
+  .gender { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .gender .big { margin-top: 0; }
   .sunbtn { position: absolute; border: 0; background: transparent; border-radius: 50%; }
   .rooms { position: absolute; left: 0; right: 0; bottom: 0; top: 54.545%; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); }
   .room { background: transparent; border: 0; position: relative; padding: 0; }

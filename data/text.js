@@ -45,7 +45,12 @@ JAMT_DATA.text = {
     pitch: 1.2 },
 
   // Crew #0 is the player (shown with the commander's name). col = suit stripe colour.
-  crew: [{ name: 'You', col: null, you: true }, { name: 'Leo', col: [70, 140, 255] }, { name: 'Sami', col: [40, 200, 120] }, { name: 'Max', col: [200, 110, 230] }],
+  // The crew is always two women and two men: the player picks woman or man for the commander, and crew #1–3 are
+  // filled from these names to make it 2 and 2 (crewNames.woman for the women, crewNames.man for the men).
+  crew: [{ name: 'You', col: null, you: true }, { name: 'Mia', col: [70, 140, 255] }, { name: 'Leo', col: [40, 200, 120] }, { name: 'Max', col: [200, 110, 230] }],
+  crewNames: { woman: ['Ana', 'Mia'], man: ['Leo', 'Max'] },
+  // What crew members say when the player taps them inside a room.
+  crewLines: ['On it!', 'Hi, Commander!', 'Science time!', 'All good here.', 'Look at that!', 'Ready!', 'Teamwork!'],
 
   // job id: [icon, name, room where the astronaut goes]
   jobs: {
