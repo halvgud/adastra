@@ -69,18 +69,18 @@ JAMT_DATA.text = {
   // Room minigames (js/minigames.js): offered inside a room once an astronaut has that job today. Optional; winning gives a bonus.
   // how = what Mission Control says before the puzzle. fact + src = the real thing it is about (a checked source in data/sources.js).
   minigames: {
-    lab: { title: '🔬 Rock fingerprint', how: 'Every kind of rock has its own pattern of colors. Find the sample that matches the rock your crew brought in!',
-      fact: 'Between 1969 and 1972, six Apollo missions brought 382 kg of Moon rocks, sand and dust home for scientists to study.', src: 'apollo_samples' },
-    trip: { title: '🚀 Sample hunt', how: 'Tap every shiny ✨ rock: those are new samples. Plain rocks 🪨 we already have. Be quick, suit air runs low!',
-      fact: 'A spacesuit gives the astronaut oxygen to breathe and water to drink. That is why every trip outside uses suit air.', src: 'nasa_spacewalk' },
+    lab: { title: '🔬 Sample memory', how: 'The lab cards got mixed up! Flip two cards at a time and find all the matching pairs.',
+      fact: 'Between 1969 and 1972, six Apollo missions brought back 2,200 separate samples from six different places on the Moon.', src: 'apollo_samples' },
+    trip: { title: '🚀 Rover route', how: 'Drag a path from 1 to the last number, in order. The route must pass through EVERY square, without crossing itself.',
+      fact: 'The record for the most spacewalks is 16, by cosmonaut Anatoly Solovyev: more than 82 hours outside in space.', src: 'nasa_spacewalk' },
     fix: { title: '🔧 Fix the pipes', how: 'Tap pipe pieces to turn them, until the water can flow from 💧 to 🚰!',
       fact: 'With the water recycler broken, four astronauts would lose about 18 kg of water every day.', src: 'model' },
-    tend: { title: '🌱 Ripe lettuce', how: 'Pick only the big, ripe lettuces 🥬. Leave the small sprouts 🌱 to keep growing!',
-      fact: 'On the Space Station, NASA’s Veggie garden grew red romaine lettuce in 33 days.', src: 'veggie' },
-    regolith: { title: '🛡️ Build the soil wall', how: 'Tap a column to add a bag of moon soil. Fill every column up to the yellow line, but no higher!',
-      fact: 'A 2024 study by Germany’s space agency (DLR) found that a few centimeters of moon soil block most of a big solar storm.', src: 'dlr_shielding' },
-    clean: { title: '🧽 Dust off the panels', how: 'Tap each speck of dust 🟫 to wipe it off the solar panels. Watch the power come back!',
-      fact: 'In 2018 a dust storm cut NASA’s Opportunity rover from 645 to 22 watt-hours a sol. Its battery ran out.', src: 'opportunity_2018' },
+    tend: { title: '🌱 Harvest time', how: 'Lettuces 🥬 ripen one by one. Pick 5 of them before they wilt 🥀, and leave the sprouts 🌱 alone!',
+      fact: 'While it grows, one square meter of lettuce makes about 7.8 grams of oxygen a day.', src: 'model' },
+    regolith: { title: '🛡️ Soil bags', how: 'Cover the whole wall with soil bags. Drag (or tap two corners) to make a box. Each box must hold exactly one number, as big as the box.',
+      fact: 'About 7 cm of moon soil cuts the dose of a big solar storm to half of NASA’s 30-day limit. That is the yellow “safe” line in your shelter.', src: 'dlr_shielding' },
+    clean: { title: '🧽 Windy panels', how: 'Wipe the dust 🟫 off the solar panels. The wind keeps blowing more in for a while: keep going until it stops!',
+      fact: 'Global dust storms on Mars happen about once every three Mars years, and they can last for weeks or months.', src: 'nasa_dust_storms' },
   },
 
   // One real fact per room and world, shown when the player zooms into a room.

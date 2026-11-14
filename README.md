@@ -17,7 +17,7 @@ Every source is listed in the game (📚 button) and in `data/sources.js`. Inven
 
 ## AI use
 
-The pixel art was generated with PixelLab (AI) and carries a visible "AI-generated art" mark. The code, texts and background music
+The pixel art was generated with PixelLab (AI) and carries a small visible "AI art" mark. The code, texts and background music
 were written with Claude (Anthropic), an AI assistant. No AI runs inside the game.
 
 ## Run it locally

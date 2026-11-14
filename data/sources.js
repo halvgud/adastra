@@ -76,6 +76,11 @@ JAMT_DATA.sources = {
     kind: 'published', model: '—', url: 'https://www.asc-csa.gc.ca/eng/sciences/food-production/growing-healthy-food-in-space-and-remote-areas.asp', official: true,
     usedFor: 'Why food must be packed for the whole mission: far from Earth, cargo ships come rarely or not at all.',
   },
+  nasa_dust_storms: {
+    name: 'NASA · The Fact and Fiction of Martian Dust Storms', agency: 'NASA', kind: 'published', model: 'EV-02 · S33',
+    url: 'https://www.nasa.gov/solar-system/the-fact-and-fiction-of-martian-dust-storms/',
+    usedFor: 'How often global dust storms happen on Mars, and how long they last.',
+  },
   apollo_samples: {
     name: 'NASA · Lunar Rocks and Soils from Apollo Missions', agency: 'NASA', kind: 'published', model: '—', url: 'https://curator.jsc.nasa.gov/lunar/',
     usedFor: 'The 382 kg of Moon rocks the Apollo astronauts brought home.',

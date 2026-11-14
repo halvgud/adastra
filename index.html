@@ -25,8 +25,6 @@
   .iconbtn { background: var(--panel-2); border: 0; min-width: 42px; min-height: 42px; font-size: 1.15rem; box-shadow: 0 0 0 2px var(--line); flex: none; }
   .iconbtn.help { background: var(--sun); box-shadow: none; }
   .iconbtn.off { opacity: .45; text-decoration: line-through; }
-  /* Visible AI watermark, required by the Space Apps rules for AI-generated images. It stays on top of pop-ups too. */
-  .aimark { position: fixed; left: 6px; bottom: 74px; z-index: 30; font: 700 .68rem/1.2 ui-monospace, Consolas, monospace; color: #fff; background: rgba(0,0,0,.72); padding: 3px 6px; box-shadow: 0 0 0 1px var(--line); pointer-events: none; }
 
   .hud { display: grid; grid-template-columns: repeat(var(--n, 3), 1fr); gap: 6px; }
   .meter { background: var(--panel); border: 0; padding: 6px 8px; text-align: left; box-shadow: inset 0 0 0 2px var(--line); }
@@ -121,7 +119,34 @@
   .mc img { width: 64px; height: 64px; image-rendering: pixelated; flex: none; background: #0b1630; box-shadow: 0 0 0 2px var(--info); }
   .mc .bubble { flex: 1; background: var(--panel-2); padding: 8px 10px; box-shadow: 0 0 0 2px var(--line); }
   .maplink { display: inline-block; margin-top: 4px; padding: 8px 12px; background: #000; color: var(--info); font-weight: 800; box-shadow: 0 0 0 2px var(--info); text-decoration: none; }
-  /* room minigames */
+  /* Small "AI art" mark on every AI-generated image (Space Apps rule: a visible watermark). */
+  .aiwrap { position: relative; display: inline-block; flex: none; line-height: 0; }
+  .aitag { position: absolute; right: 2px; bottom: 2px; font: 700 9px/1 ui-monospace, Consolas, monospace; font-style: normal; color: #fff; background: rgba(0,0,0,.6); padding: 2px 3px; pointer-events: none; }
+  .mission .aitag { bottom: auto; top: 4px; left: 4px; right: auto; }
+  /* room minigames: memory, route, boxes */
+  .memo { display: grid; grid-template-columns: repeat(4, 70px); gap: 6px; perspective: 600px; }
+  .mcard { position: relative; width: 70px; height: 78px; border: 0; padding: 0; background: none; transform-style: preserve-3d; transition: transform .35s; }
+  .mcard span { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; backface-visibility: hidden; box-shadow: inset 0 0 0 2px var(--line); }
+  .mcard .back { background: #23305a; color: var(--info); font: 900 1.6rem ui-monospace, monospace; }
+  .mcard .front { background: var(--panel-2); transform: rotateY(180deg); font-size: 1.7rem; line-height: 1.1; }
+  .mcard .front small { font-size: .62rem; color: var(--muted); }
+  .mcard.up, .mcard.done { transform: rotateY(180deg); } .mcard.done .front { box-shadow: inset 0 0 0 3px var(--ok); }
+  .zip { position: relative; display: grid; grid-template-columns: repeat(var(--n), 52px); touch-action: none; user-select: none; }
+  .zc { width: 52px; height: 52px; border: 0; background: #2b2f3a; box-shadow: inset 0 0 0 1px var(--line); color: #000; position: relative; z-index: 1; }
+  .zc.on { background: rgba(86,180,233,.28); } .zc.head { background: rgba(240,228,66,.45); }
+  .zc b { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--sun); font: 900 1rem ui-monospace, monospace; }
+  .zipline { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+  .zipline polyline { fill: none; stroke: var(--info); stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+  .zc { background: transparent; } .zip { background: #2b2f3a; }
+  .patch { position: relative; display: grid; grid-template-columns: repeat(var(--w), 52px); touch-action: none; user-select: none; background: #1b1f29; }
+  .pc { width: 52px; height: 52px; border: 0; background: transparent; box-shadow: inset 0 0 0 1px var(--line); position: relative; z-index: 2; color: #fff; }
+  .pc b { font: 900 1.25rem ui-monospace, monospace; text-shadow: 0 1px 0 #000; } .pc.pend { box-shadow: inset 0 0 0 3px var(--sun); }
+  .boxes { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+  .boxes i { position: absolute; box-sizing: border-box; border: 3px solid #000; opacity: .9; }
+  .boxes i.bad { border-color: var(--low); } .boxes i.good { border-color: #000; } .boxes i.prev { border: 3px dashed var(--sun); background: rgba(240,228,66,.15); opacity: 1; }
+  .mgsmall { border: 0; background: var(--panel-2); box-shadow: 0 0 0 2px var(--line); padding: 8px 12px; min-height: 40px; font-weight: 700; }
+  .tile.ripe { box-shadow: inset 0 0 0 3px var(--ok); animation: tgt .7s steps(2) infinite; }
+  /* room minigames (older) */
   .big.mg { box-shadow: 0 0 0 3px var(--info); }
   .mg { margin-top: 10px; display: grid; justify-items: center; gap: 6px; }
   .mgq { margin: 4px 0; font-weight: 700; text-align: center; }
@@ -198,9 +223,8 @@
   </div>
   <section class="panel" id="panel"></section>
 </main>
-<div class="aimark" aria-hidden="true">🤖 AI-generated art (PixelLab)</div>
 <div class="bottom"><button class="skip" id="skip" aria-label="Skip quiet days">⏩</button><button class="end" id="end"></button></div>
-<div class="coach" id="coach" role="status"><img alt="" id="coachimg"><p id="coachtxt"></p><div class="btns"><button id="coachbtn">OK</button><button id="coachmore" hidden>📊 Details</button><button class="read" id="coachread" aria-label="Read this aloud">🔊</button></div></div>
+<div class="coach" id="coach" role="status"><span class="aiwrap"><img alt="" id="coachimg"><i class="aitag">AI art</i></span><p id="coachtxt"></p><div class="btns"><button id="coachbtn">OK</button><button id="coachmore" hidden>📊 Details</button><button class="read" id="coachread" aria-label="Read this aloud">🔊</button></div></div>
 <div class="modal" id="pop" role="dialog" aria-modal="true"><div class="card" id="popcard"></div></div>
 
 <script src="data/donki-snapshot.js"></script>
