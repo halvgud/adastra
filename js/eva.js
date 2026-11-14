@@ -140,6 +140,67 @@
   }
   const sparkle = (g, x, y, t, s) => { const k = 0.5 + 0.5 * Math.sin(t / 90); g.fillStyle = `rgba(255,250,200,${0.4 + 0.6 * k})`; g.fillRect(x - s * k, y, s * 2 * k + 1, 1); g.fillRect(x, y - s * k, 1, s * 2 * k + 1); };
 
+  // ---------- the room behind the door (inside scenes) ----------
+  // Drawn in the doorway's rectangle (x0, y0, w, h) as a little box in perspective: back wall, side walls, floor and
+  // ceiling, then the room's own things. Coordinates inside are fractions of that rectangle.
+  function roomBox(g, x0, y0, w, h, c) {
+    const X = f => x0 + f * w, Y = f => y0 + f * h, quad = (pts, col) => { g.fillStyle = col; g.beginPath(); pts.forEach(([a, b], i) => i ? g.lineTo(X(a), Y(b)) : g.moveTo(X(a), Y(b))); g.closePath(); g.fill(); };
+    const L = 0.18, R = 0.82, T = 0.14, B = 0.7; // the back wall
+    quad([[0, 0], [1, 0], [R, T], [L, T]], c.ceil); quad([[0, 1], [1, 1], [R, B], [L, B]], c.floor);
+    quad([[0, 0], [L, T], [L, B], [0, 1]], c.side); quad([[1, 0], [R, T], [R, B], [1, 1]], c.side2 || c.side); quad([[L, T], [R, T], [R, B], [L, B]], c.back);
+    g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 1; g.beginPath(); // floor tiles going away from you
+    for (let i = 1; i < 4; i++) { const k = i / 4, yy = Y(B + (1 - B) * k * k); g.moveTo(X(L * (1 - k * k)), yy); g.lineTo(X(R + (1 - R) * k * k), yy); }
+    for (let i = 1; i < 5; i++) { const f = i / 5; g.moveTo(X(L + (R - L) * f), Y(B)); g.lineTo(X(f), Y(1)); } g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(X(0.38), Y(0.05), w * 0.24, h * 0.03); // ceiling light
+    return { X, Y, L, R, T, B };
+  }
+  const ROOMVIEW = {
+    lab(g, x0, y0, w, h, t) {
+      const { X, Y } = roomBox(g, x0, y0, w, h, { ceil: '#5d6678', floor: '#7d8799', side: '#aab4c6', side2: '#9ba6b9', back: '#d3dae6' }), R = (a, b, ww, hh, col) => { g.fillStyle = col; g.fillRect(X(a), Y(b), w * ww, h * hh); };
+      R(0.27, 0.19, 0.46, 0.2, '#1c2a44'); R(0.28, 0.2, 0.44, 0.18, '#0d2a4a');                                              // big screen
+      for (let i = 0; i < 6; i++) { const yy = (((t / 900) + i / 6) % 1); R(0.3, 0.21 + yy * 0.15, 0.12 + ((i * 7) % 5) * 0.05, 0.012, ['#7fffd4', '#F0E442', '#56B4E9'][i % 3]); } // data scrolling
+      g.strokeStyle = '#3ddc97'; g.lineWidth = 1; g.beginPath(); for (let i = 0; i <= 20; i++) { const f = i / 20; g.lineTo(X(0.52 + f * 0.18), Y(0.33 - 0.06 * Math.abs(Math.sin(f * 9 + t / 400)))); } g.stroke(); // a graph
+      R(0.21, 0.44, 0.58, 0.015, '#8a93a6'); ['#d65b8e', '#3ab7a0', '#e8d24a', '#5aa0e8', '#8e5bd6', '#e88a3a', '#3ab7a0'].forEach((col, i) => { R(0.23 + i * 0.08, 0.4, 0.04, 0.04, col); R(0.235 + i * 0.08, 0.402, 0.01, 0.015, 'rgba(255,255,255,.6)'); }); // shelf of sample jars
+      R(0.16, 0.6, 0.68, 0.05, '#b48a5a'); R(0.16, 0.65, 0.68, 0.015, '#7a5a3a'); R(0.2, 0.665, 0.03, 0.14, '#555c6b'); R(0.77, 0.665, 0.03, 0.14, '#555c6b'); // the desk
+      R(0.3, 0.5, 0.03, 0.1, '#e8ebf2'); R(0.27, 0.48, 0.09, 0.03, '#c9ced9'); R(0.28, 0.585, 0.08, 0.02, '#8a93a6'); R(0.31, 0.46, 0.02, 0.03, '#2a2a2a'); // microscope
+      g.fillStyle = '#6a4ea0'; g.beginPath(); g.ellipse(X(0.62), Y(0.585), w * 0.06, h * 0.025, 0, 0, 6.283); g.fill(); // the rock sample, under a lamp
+      const glow = 0.5 + 0.5 * Math.sin(t / 200); g.fillStyle = `rgba(240,228,66,${0.15 + 0.2 * glow})`; g.beginPath(); g.moveTo(X(0.6), Y(0.47)); g.lineTo(X(0.64), Y(0.47)); g.lineTo(X(0.72), Y(0.6)); g.lineTo(X(0.52), Y(0.6)); g.fill();
+      R(0.59, 0.45, 0.06, 0.02, '#3a3f4a');
+      for (let i = 0; i < 4; i++) R(0.88, 0.3 + i * 0.07, 0.04, 0.025, Math.floor(t / 300 + i) % 3 ? '#3ddc97' : '#1b4d3a');            // control panel on the right wall
+      R(0.04, 0.3, 0.08, 0.16, '#F0E442'); R(0.05, 0.32, 0.06, 0.12, '#1c1f2b');                                              // a poster on the left wall
+    },
+    fix(g, x0, y0, w, h, t) {
+      const { X, Y } = roomBox(g, x0, y0, w, h, { ceil: '#555b66', floor: '#6f7684', side: '#b2b7c2', side2: '#a2a8b4', back: '#c9ced8' }), R = (a, b, ww, hh, col) => { g.fillStyle = col; g.fillRect(X(a), Y(b), w * ww, h * hh); };
+      R(0.18, 0.24, 0.64, 0.035, '#8c95a8'); R(0.18, 0.245, 0.64, 0.008, '#c9d0de'); R(0.7, 0.24, 0.035, 0.46, '#8c95a8');     // pipes
+      R(0.42, 0.16, 0.16, 0.54, '#20324a'); R(0.43, 0.17, 0.14, 0.52, '#2f6ea8');                                             // the glass column of the air maker
+      for (let i = 0; i < 10; i++) { const p = ((t / 1400) + i / 10) % 1; g.fillStyle = `rgba(220,245,255,${1 - p * 0.6})`; g.beginPath(); g.arc(X(0.45 + ((i * 7) % 10) / 100), Y(0.68 - p * 0.5), w * 0.012, 0, 6.283); g.fill(); } // bubbles of air
+      [[0.22, 0.42], [0.31, 0.44]].forEach(([a, b]) => { R(a, b, 0.07, 0.26, '#eef0f5'); R(a, b + 0.06, 0.07, 0.025, '#d55e00'); R(a + 0.02, b - 0.03, 0.03, 0.03, '#8c95a8'); }); // oxygen tanks
+      g.fillStyle = '#111'; g.beginPath(); g.arc(X(0.66), Y(0.4), w * 0.035, 0, 6.283); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 1; g.beginPath(); g.moveTo(X(0.66), Y(0.4)); const na = -2.2 + Math.sin(t / 300) * 0.3; g.lineTo(X(0.66) + Math.cos(na) * w * 0.03, Y(0.4) + Math.sin(na) * w * 0.03); g.stroke(); // a gauge
+      R(0.6, 0.18, 0.04, 0.03, Math.floor(t / 350) % 2 ? '#ff3b30' : '#5a1512');                                              // warning light
+      for (let i = 0; i < 6; i++) { const p = ((t / 900) + i / 6) % 1; g.fillStyle = `rgba(240,245,255,${0.6 * (1 - p)})`; g.beginPath(); g.arc(X(0.72 + p * 0.05), Y(0.27 - p * 0.1), w * (0.01 + p * 0.03), 0, 6.283); g.fill(); } // a puff of steam from the joint
+      R(0.86, 0.36, 0.08, 0.2, '#596173'); for (let i = 0; i < 3; i++) R(0.875, 0.39 + i * 0.05, 0.05, 0.025, Math.floor(t / 400 + i) % 2 ? '#56B4E9' : '#24425a'); // control box
+    },
+    tend(g, x0, y0, w, h, t) {
+      const { X, Y } = roomBox(g, x0, y0, w, h, { ceil: '#3a2a4e', floor: '#5a4a62', side: '#7a5f8f', side2: '#6d5481', back: '#8a6ea0' }), R = (a, b, ww, hh, col) => { g.fillStyle = col; g.fillRect(X(a), Y(b), w * ww, h * hh); };
+      const pulse = 0.5 + 0.5 * Math.sin(t / 500); g.fillStyle = `rgba(230,120,255,${0.18 + 0.08 * pulse})`; g.fillRect(x0, y0, w, h); // grow light everywhere
+      [0.3, 0.52].forEach((yy, row) => { R(0.2, yy - 0.12, 0.6, 0.015, '#f6d6ff'); R(0.2, yy, 0.6, 0.03, '#5b4632'); R(0.2, yy + 0.03, 0.6, 0.01, '#3e3022'); // light bar, tray
+        for (let i = 0; i < 6; i++) { const cx = X(0.25 + i * 0.1), cy = Y(yy), s = w * (0.035 + (row ? 0.008 : 0)), sw = Math.sin(t / 700 + i + row) * 0.15;
+          for (let j = 0; j < 5; j++) { const a = j / 5 * 6.283 + sw; g.fillStyle = j % 2 ? '#4fbf5a' : '#2f9a46'; g.beginPath(); g.ellipse(cx + Math.cos(a) * s * 0.5, cy - s * 0.5 + Math.sin(a) * s * 0.25, s * 0.5, s * 0.3, a, 0, 6.283); g.fill(); } } });
+      for (let i = 0; i < 4; i++) { const cx = X(0.08 + (i % 2) * 0.84), cy = Y(0.86 - (i > 1 ? 0.06 : 0)), s = w * 0.06; g.fillStyle = '#5b4632'; g.fillRect(cx - s * 0.6, cy, s * 1.2, s * 0.5); // big pots in front
+        for (let j = 0; j < 6; j++) { const a = j / 6 * 6.283 + Math.sin(t / 800 + i) * 0.1; g.fillStyle = j % 2 ? '#3fae4e' : '#2a8a3e'; g.beginPath(); g.ellipse(cx + Math.cos(a) * s * 0.5, cy - s * 0.3 + Math.sin(a) * s * 0.25, s * 0.5, s * 0.28, a, 0, 6.283); g.fill(); } }
+      for (let i = 0; i < 10; i++) { const p = ((t / 1200) + i / 10) % 1; g.fillStyle = `rgba(180,220,255,${0.6 * (1 - p)})`; g.fillRect(X(0.22 + (i * 0.061) % 0.56), Y(0.2 + p * 0.45), 1, 2); } // mist
+    },
+  };
+  // The doorway on screen: the room is drawn inside the part of the door that is open; at the end you step in (zoom).
+  function doorView(g, c, open, job, t) {
+    const draw = ROOMVIEW[job]; if (!draw || open <= 0) return;
+    const te = LEND - c.y, sx = u => W / 2 + (u - c.x) / te * F, top = c.hy - (2.0 - CAM) * F / te, bot = c.hy + CAM * F / te;
+    const z = 1 + ease(seg(t, 4700, 5300)) * 0.9, fx0 = sx(-0.75), fw = sx(0.75) - fx0, fh = bot - top, cx = fx0 + fw / 2, cy = top + fh * 0.5;
+    const gx0 = sx(-open * 0.75), gw = sx(open * 0.75) - gx0; // the open part of the door, growing with you as you step in
+    g.save(); g.beginPath(); g.rect(cx + (gx0 - cx) * z, cy + (top - cy) * z, gw * z, fh * z); g.clip();
+    draw(g, cx - fw * z / 2, cy - fh * z / 2, fw * z, fh * z, t); g.restore();
+  }
+
   // ---------- the six scenes ----------
   // outside scenes: draw(g, img, t, X) draws everything and returns the camera while walking (null in a close-up).
   // inside scenes: the corridor is shared; close(g, t, X) draws the close-up after the door. banner + at = the text at the end.
@@ -280,7 +341,7 @@
       const t = fixed ? opt.at : still ? S.at + 600 : now - t0; if (t >= DUR && !fixed) { finish(); return; }
       let c = null;
       if (S.outside) { c = S.draw(g, img, t, X); if (c) helmetOverlay(g, t, X); }
-      else if (t < 5300) { c = corridorCam(t, still); drawCorridor(g, img, S.theme, c, ease(seg(t, 3600, 4700))); if (t > 3600 && t < 3650) X.sound('door'); helmetOverlay(g, t, X); flash(g, t, 5300); }
+      else if (t < 5300) { c = corridorCam(t, still); const op = ease(seg(t, 3600, 4700)); drawCorridor(g, img, S.theme, c, op); doorView(g, c, op, opt.job, t); if (t > 3600 && t < 3650) X.sound('door'); helmetOverlay(g, t, X); flash(g, t, 5300); }
       else { S.close(g, t, X); flash(g, t, 5300); helmetOverlay(g, t, X); }
       banner(g, t, { banner: opt.banner || S.banner, at: S.at });
       if (c && c.walking) { const step = Math.floor(t / (S.outside && moon ? 840 : 380)); if (step !== lastStep) { lastStep = step; X.sound('step'); } }
