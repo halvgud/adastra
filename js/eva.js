@@ -33,7 +33,8 @@
   const FXI = {}, fx = n => { if (!FXI[n]) { FXI[n] = new Image(); FXI[n].src = n.includes('/') ? n : 'assets/pixellab/fx/' + n + '.png'; } return FXI[n]; };
   const ready = im => !!(im && im.complete && im.naturalWidth);
   ['rock-moon-0', 'rock-moon-1', 'rock-moon-2', 'rock-mars-0', 'rock-mars-1', 'rock-mars-2', 'sample', 'hills-moon', 'hills-mars', 'ground-moon', 'ground-mars',
-    'assets/pixellab/props/solar-panels.png', 'assets/pixellab/mg/solar.png', 'assets/pixellab/mg/dust.png', 'assets/pixellab/mg/sandbag.png', 'assets/pixellab/garden/lettuce.png', 'habitat', 'antenna', 'lander'].forEach(fx);
+    'assets/pixellab/props/solar-panels.png', 'assets/pixellab/mg/solar.png', 'assets/pixellab/mg/dust.png', 'assets/pixellab/mg/sandbag.png', 'assets/pixellab/garden/lettuce.png', 'habitat', 'antenna', 'lander', 'corr-wall', 'corr-floor', 'corr-ceil', 'corr-door', 'microscope',
+    'assets/pixellab/rooms/lab.png', 'assets/pixellab/rooms/oxygen.png', 'assets/pixellab/rooms/greenhouse.png'].forEach(fx);
   const PIX = {}; function pixelsOf(n) { // the RGBA of a picture, read once
     if (PIX[n] !== undefined) return PIX[n]; const im = fx(n); if (!ready(im)) return null;
     try { const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const g = c.getContext('2d'); g.drawImage(im, 0, 0); PIX[n] = { w: im.width, h: im.height, d: g.getImageData(0, 0, im.width, im.height).data }; } catch (e) { PIX[n] = false; } return PIX[n]; }
@@ -131,22 +132,29 @@
 
   // ---------- inside: a corridor of the base (ray caster), with a sliding door at the end ----------
   const LEND = 9, WALLH = 2.4;
+  // A texel of a PixelLab texture (wrapped), as [r, g, b]; null if the picture is not ready
+  const X_MICRO = {}; // scratch canvas for the microscope's focus effect
+  const texel = (T, tx, ty) => { const x = ((tx | 0) % T.w + T.w) % T.w, y = ((ty | 0) % T.h + T.h) % T.h, i = (y * T.w + x) * 4; return [T.d[i], T.d[i + 1], T.d[i + 2]]; };
+  const mix = (a, b, k) => [a[0] * (1 - k) + b[0] * k, a[1] * (1 - k) + b[1] * k, a[2] * (1 - k) + b[2] * k];
   function drawCorridor(g, img, th, c, door) {
-    const px = img.data;
+    const px = img.data, TW = pixelsOf('corr-wall'), TF = pixelsOf('corr-floor'), TC = pixelsOf('corr-ceil'), TD = pixelsOf('corr-door'); // PixelLab textures
     for (let x = 0; x < W; x++) {
       const lat = (x - W / 2) / F, tw = lat > 0.0001 ? (1 - c.x) / lat : lat < -0.0001 ? (-1 - c.x) / lat : 1e9, te = LEND - c.y, end = te < tw, dist = end ? te : tw;
       const u = end ? c.x + lat * te : c.y + tw, top = c.hy - (WALLH - CAM) * F / dist, bot = c.hy + CAM * F / dist, shade = 1 / (1 + dist * 0.09) * (end ? 1 : lat > 0 ? 0.9 : 1);
       for (let y = 0; y < H; y++) { const i = (y * W + x) * 4; let col, m = 1; px[i + 3] = 255;
         if (y < top) { const d = (WALLH - CAM) * F / (c.hy - y), wx = c.x + lat * d, wy = c.y + d; // ceiling, with a strip of light
-          col = Math.abs(wx) < 0.18 ? [235, 240, 255] : th.ceil; if ((wy % 1.5) < 0.08) m = 0.7; m *= Math.abs(wx) < 0.18 ? 1 : 1 / (1 + d * 0.09); }
+          if (TC) { col = texel(TC, (wx + 1) / 2 * TC.w, wy * 22); m = 1 / (1 + d * 0.07); }
+          else { col = Math.abs(wx) < 0.18 ? [235, 240, 255] : th.ceil; if ((wy % 1.5) < 0.08) m = 0.7; m *= Math.abs(wx) < 0.18 ? 1 : 1 / (1 + d * 0.09); } }
         else if (y > bot) { const d = CAM * F / (y - c.hy), wx = c.x + lat * d, wy = c.y + d; // floor tiles
-          col = Math.abs(wx) < 0.08 ? th.stripe : th.floor; if (((wx + 4) % 0.7) < 0.05 || (wy % 0.7) < 0.05) m = 0.65; m *= 1 / (1 + d * 0.09); }
+          if (TF) { col = Math.abs(wx) < 0.05 ? mix(texel(TF, wx * 32, wy * 32), th.stripe, 0.7) : texel(TF, wx * 32, wy * 32); m = 1 / (1 + d * 0.09); }
+          else { col = Math.abs(wx) < 0.08 ? th.stripe : th.floor; if (((wx + 4) % 0.7) < 0.05 || (wy % 0.7) < 0.05) m = 0.65; m *= 1 / (1 + d * 0.09); } }
         else { const v = (bot - y) / (bot - top) * WALLH; m = shade; // walls
           if (end && Math.abs(u) < 0.75 && v < 2.0) { const open = door * 0.75; // the door at the end, sliding open
             if (Math.abs(u) < open) { const k = 1 - Math.abs(u) / 0.75; col = [th.glow[0] * (0.6 + 0.4 * k), th.glow[1] * (0.6 + 0.4 * k), th.glow[2] * (0.6 + 0.4 * k)]; m = 1; }
+            else if (TD) { const tx = u < 0 ? (u + open + 0.75) / 1.5 * TD.w : (u - open + 0.75) / 1.5 * TD.w; col = texel(TD, tx, (1 - v / 2.0) * TD.h); } // the two halves slide apart
             else { const edge = Math.abs(Math.abs(u) - open) < 0.08; col = edge ? (((v * 5) | 0) % 2 ? [20, 20, 20] : [240, 228, 66]) : [140, 148, 166]; if ((v % 0.5) < 0.04) m *= 0.8; } }
           else if (end && v > 2.05 && v < 2.3 && Math.abs(u) < 0.5) { col = th.glow; m = 1; } // lit sign over the door
-          else { col = th.wall; if ((u % 1.5 + 1.5) % 1.5 < 0.05) m *= 0.6; if (v < 0.15) m *= 0.7;
+          else { if (TW) col = mix(texel(TW, u * 26, (1 - v / WALLH) * TW.h), th.wall, 0.22); else { col = th.wall; if ((u % 1.5 + 1.5) % 1.5 < 0.05) m *= 0.6; } if (v < 0.15) m *= 0.7; // panels, tinted by the room's colour
             if (v > 1.0 && v < 1.1) col = th.stripe;
             if (!end && v > 1.55 && v < 1.75) { const q = (u % 3 + 3) % 3; if (q > 1.3 && q < 1.5) col = (((u / 3) | 0) + ((c.t / 400) | 0)) % 2 ? [61, 220, 151] : [40, 70, 60]; } } } // blinking lights
         px[i] = col[0] * m; px[i + 1] = col[1] * m; px[i + 2] = col[2] * m; } }
@@ -250,7 +258,11 @@
     const z = 1 + ease(seg(t, 4700, 5300)) * 0.9, fx0 = sx(-0.75), fw = sx(0.75) - fx0, fh = bot - top, cx = fx0 + fw / 2, cy = top + fh * 0.5;
     const gx0 = sx(-open * 0.75), gw = sx(open * 0.75) - gx0; // the open part of the door, growing with you as you step in
     g.save(); g.beginPath(); g.rect(cx + (gx0 - cx) * z, cy + (top - cy) * z, gw * z, fh * z); g.clip();
-    draw(g, cx - fw * z / 2, cy - fh * z / 2, fw * z, fh * z, t); g.restore();
+    const pic = fx(`assets/pixellab/rooms/${{ lab: 'lab', fix: 'oxygen', tend: 'greenhouse' }[job]}.png`), rx = cx - fw * z / 2, ry = cy - fh * z / 2, rw = fw * z, rh = fh * z;
+    if (ready(pic)) { // the room's own PixelLab picture (the same one the base shows), cropped to fill the doorway
+      g.fillStyle = '#1b1f2b'; g.fillRect(rx, ry, rw, rh); const sc = Math.max(rw / pic.width, rh / pic.height), dw = pic.width * sc, dh = pic.height * sc;
+      g.imageSmoothingEnabled = false; g.drawImage(pic, rx + (rw - dw) / 2, ry + rh - dh, dw, dh); }
+    else draw(g, rx, ry, rw, rh, t); g.restore();
   }
 
   // ---------- the six scenes ----------
@@ -301,6 +313,15 @@
 
     lab: { outside: false, banner: 'DISCOVERY! +1 ★', at: 8200, theme: { wall: [150, 160, 185], ceil: [70, 78, 98], floor: [92, 100, 120], stripe: [86, 180, 233], glow: [120, 220, 255] },
       close(g, t) { // a microscope: blurry, then sharp; one crystal lights up
+        const MI = fx('microscope');
+        if (ready(MI)) { // the PixelLab microscope view: out of focus (drawn tiny, then scaled up), slowly sharpening and zooming in
+          const f = ease(seg(t, 5400, 7200)), z = 1 + 0.15 * seg(t, 5400, 10000), small = Math.max(8, Math.round(W * (0.12 + 0.88 * f)));
+          if (!X_MICRO.c) { X_MICRO.c = document.createElement('canvas'); } const mc = X_MICRO.c; mc.width = small; mc.height = Math.round(small * H / W);
+          const mg = mc.getContext('2d'); mg.imageSmoothingEnabled = true; mg.drawImage(MI, 0, 0, mc.width, mc.height);
+          g.fillStyle = '#000'; g.fillRect(0, 0, W, H); g.imageSmoothingEnabled = f > 0.95 ? false : true;
+          g.drawImage(mc, W / 2 - W * z / 2, H / 2 - H * z / 2, W * z, H * z); g.imageSmoothingEnabled = false;
+          if (t > 7400) { const k = 0.5 + 0.5 * Math.sin(t / 150); g.strokeStyle = `rgba(240,228,66,${0.5 + 0.5 * k})`; g.lineWidth = 2; g.strokeRect(W / 2 + 6, H / 2 - 16, 18, 14); sparkle(g, W / 2 + 15, H / 2 - 20, t, 5); }
+          g.fillStyle = '#7fffd4'; g.font = '7px ui-monospace, Consolas, monospace'; g.textAlign = 'left'; g.fillText(f < 1 ? 'focusing…' : 'x400', 6, H - 6); return; }
         g.fillStyle = '#000'; g.fillRect(0, 0, W, H); g.save(); g.beginPath(); g.arc(W / 2, H / 2, 54, 0, 6.283); g.clip(); g.fillStyle = '#e9e2cf'; g.fillRect(0, 0, W, H);
         const blur = 1 - ease(seg(t, 5400, 7000)), rnd = mkRnd(17), rot = t / 6000, cols = ['#8e5bd6', '#3ab7a0', '#e88a3a', '#e8d24a', '#5aa0e8', '#d65b8e'];
         for (let i = 0; i < 16; i++) { const a0 = rnd() * 6.283, r0 = rnd() * 48, jx = (rnd() - 0.5) * blur * 8, jy = (rnd() - 0.5) * blur * 8, n = 5 + ((rnd() * 3) | 0), s = 8 + rnd() * 10;
