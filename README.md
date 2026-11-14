@@ -3,7 +3,7 @@
 A browser game for kids aged 7 to 12, made for the NASA Space Apps Challenge 2026.
 You command a small base on the Moon or Mars and balance power, air and water, radiation shielding, food and the radio delay to Earth.
 
-**Play:** <https://adastra.earth/>. No download, no account.
+**Play:** <https://adastra.earth/>.
 
 ## Real data
 
