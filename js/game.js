@@ -152,7 +152,7 @@
     g.putImageData(d, 0, 0); return c;
   }
   async function loadArt() {
-    const jobs = [load('bg_moon', ART + 'bg/moon.png'), load('bg_mars', ART + 'bg/mars.png'), ...['moon2', 'moon3', 'mars2'].map(k => load('bg_' + k, ART + 'bg/' + k + '.png')), load('panels', ART + 'props/solar-panels.png'), load('reactor', ART + 'props/reactor.png'), load('rover', ART + 'props/rover.png'), ...['soil-moon', 'soil-mars', 'tunnel', 'shaft', 'hatch', 'entry-moon', 'entry-mars'].map(n => load('base_' + n, ART + 'base/' + n + '.png')), load('south', ART + 'astronaut/Idle/rotations/south.png'), load('north', ART + 'astronaut/Idle/rotations/north.png')];
+    const jobs = [load('bg_moon', ART + 'bg/moon.png'), load('bg_mars', ART + 'bg/mars.png'), ...['moon2', 'moon3', 'mars2'].map(k => load('bg_' + k, ART + 'bg/' + k + '.png')), ...['moon', 'moon2', 'moon3', 'mars', 'mars2'].map(k => load('bgf_' + k, ART + 'bg/' + k + '-front.png')), load('panels', ART + 'props/solar-panels.png'), load('reactor', ART + 'props/reactor.png'), load('rover', ART + 'props/rover.png'), ...['soil-moon', 'soil-mars', 'tunnel', 'shaft', 'hatch', 'entry-moon', 'entry-mars'].map(n => load('base_' + n, ART + 'base/' + n + '.png')), load('south', ART + 'astronaut/Idle/rotations/south.png'), load('north', ART + 'astronaut/Idle/rotations/north.png')];
     ROOMS.forEach(r => jobs.push(load('room_' + r.img, ART + 'rooms/' + r.img + '.png'), load('cell_' + r.id, ART + 'cells/' + r.id + '.png'), load('roomm_' + r.img, ART + 'rooms/' + r.img + '-mars.png'), load('roomn_' + r.img, ART + 'rooms/' + r.img + '-moon.png'), load('cellm_' + r.id, ART + 'cells/' + r.id + '-mars.png')));
     Object.keys(MISSIONS).forEach(k => jobs.push(load('patch_' + k, patchSrc(k))));
     // Each animation is one strip of frames side by side (assets/pixellab/astronaut/strips/, made by tools/build_atlas.py)
@@ -202,7 +202,20 @@
   const roomXY = i => [(i % 3) * RW, SKY + Math.floor(i / 3) * RH];
   const crewPos = CREW.map((c, k) => ({ x: 22 + k * 26, tx: 22 + k * 26, room: 3, facing: 1 }));
   let S = null, view = { mode: 'base', room: null, t0: 0 }, selected = null, FX = null, FLOAT = [], PREV = null, MOODS = {}, BANNER = null, SUMMARY = null, SUMMARY_NEXT = null;
-  const SUNPOS = () => S && S.world === 'mars' ? [180, 54, 15] : [26, 96, 10];
+  // The Sun moves, and always stays BEHIND the mountains (tools/horizon.py splits each background into sky and land).
+  // HORIZON: the height of the ridge every 8 px of the 320 x 160 background picture.
+  const HORIZON = { moon: [65,68,69,69,70,76,80,83,83,82,82,80,80,83,82,85,89,87,84,86,88,88,90,86,86,89,88,83,81,83,83,83,79,75,69,61,61,63,63,61], moon2: [75,70,72,71,71,71,63,63,60,57,57,61,58,54,55,59,63,70,64,62,61,61,57,58,62,62,89,87,71,60,61,63,64,68,69,63,63,64,63,61], moon3: [75,74,74,74,74,75,77,79,81,83,86,89,91,90,89,89,89,90,91,90,90,89,88,87,85,84,84,85,86,86,87,86,84,81,78,77,76,76,76,76], mars: [53,49,45,40,36,36,45,53,57,62,65,65,69,75,77,77,79,81,83,82,82,82,81,83,86,86,88,89,90,91,91,94,101,101,101,101,101,93,86,82], mars2: [62,63,64,65,66,66,67,67,70,71,71,71,71,71,71,71,71,71,71,71,71,71,70,70,70,70,70,70,70,70,70,70,69,69,69,69,69,70,71,71] };
+  const bgKey = () => HORIZON[S.key] ? S.key : S.world === 'mars' ? 'mars' : 'moon';
+  const ridgeAt = x => HORIZON[bgKey()][Math.max(0, Math.min(39, Math.floor(x / 9.6)))] * (SKY / 160); // in canvas pixels
+  // Moon (south pole): the Sun only skims the horizon. Day after day it slides along it, sinks behind the ridge before the
+  // dark days and peeks out again after them. Mars: it rises, crosses the sky and sets behind the mountains (one sol about every 2.5 minutes).
+  function SUNPOS(t) { if (!S) return [26, 96, 10]; t = t === undefined ? performance.now() : t;
+    if (S.world === 'mars') { const ph = (t % 150000) / 150000, x = 20 + ph * 344; return [x, ridgeAt(x) - Math.sin(ph * Math.PI) * 100 + 20, 15]; }
+    const days = Math.max(2, S.days || 20), x = 34 + (S.day / (days - 1)) * 250 + Math.sin(t / 9000) * 2, dk = S.M.dark || [];
+    const next = dk.find(d => d >= S.day), prev = dk.filter(d => d < S.day).pop(); let h = 13;
+    if (next !== undefined && next - S.day <= 2) h = [-30, 2, 7][next - S.day];          // sinking as the dark days come (0 = dark today)
+    if (prev !== undefined && S.day - prev <= 2) h = Math.min(h, [0, 1, 7][S.day - prev]); // and rising again after them
+    return [x, ridgeAt(x) - h, 10]; }
   // Free astronauts spread out (shelter, battery room, lab, air maker) instead of all crowding into the shelter.
   const FREE_ROOMS = ['shelter', 'battery', 'lab', 'oxygen'];
   function crewHome() { const n = {}; let free = 0; CREW.forEach((c, k) => { const j = S.jobs[k], want = j ? roomFor(j) : FREE_ROOMS[free++ % FREE_ROOMS.length], ri = Math.max(0, ROOMS.findIndex(r => r.id === want)); n[ri] = (n[ri] || 0) + 1;
@@ -332,17 +345,21 @@
     if (SMALLTINT.width !== im.width || SMALLTINT.height !== im.height) { SMALLTINT.width = im.width; SMALLTINT.height = im.height; }
     const g = SMALLTINT.getContext('2d'); g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, im.width, im.height); g.drawImage(im, 0, 0);
     g.globalCompositeOperation = 'source-atop'; g.fillStyle = color; g.fillRect(0, 0, im.width, im.height); g.globalCompositeOperation = 'source-over'; ctx.drawImage(SMALLTINT, x, y); }
+  let SUNSEEN = [];
   function drawBase(t) {
     const s = S, moon = s.world === 'moon', L = light(s);
     ctx.fillStyle = moon ? '#000' : '#5a2a17'; ctx.fillRect(0, 0, CW, CH);
     const bg = IMG['bg_' + S.key] || IMG[moon ? 'bg_moon' : 'bg_mars']; if (bg) ctx.drawImage(bg, 0, 0, 320, 160, 0, 0, CW, SKY); // each mission has its own place
+    const sun = SUNPOS(t); if (!(moon && L === 0)) drawSun(...sun); // the Sun, then the Earth and the mountains in front of it
+    if (Math.abs(sun[0] - (SUNSEEN[0] || 0)) + Math.abs(sun[1] - (SUNSEEN[1] || 0)) > 0.5) { SUNSEEN = sun; placeSunButton(); }
     if (moon) { const ex = 186, ey = 59, R = 13; for (let yy = -R; yy <= R; yy++) for (let xx = -R; xx <= R; xx++) if (xx * xx + yy * yy <= R * R + R) { ctx.fillStyle = xx < 2 ? ((xx * 7 + yy * 3) % 5 === 0 ? '#3fa66b' : '#2f7fd8') : '#0b2440'; ctx.fillRect(ex + xx, ey + yy, 1, 1); } }
+    const front = IMG['bgf_' + bgKey()]; if (front && bg) ctx.drawImage(front, 0, 0, 320, 160, 0, 0, CW, SKY); // the land in front of the Sun
     if (moon && L === 0) { ctx.fillStyle = 'rgba(0,0,12,.72)'; ctx.fillRect(0, 0, CW, SKY); }
     const dust = !moon && s.M.dust[s.day] !== undefined ? 1 - s.M.dust[s.day] : 0;
     if (dust > 0) { ctx.fillStyle = `rgba(190,110,50,${0.25 + dust * 0.6})`; ctx.fillRect(0, 0, CW, SKY);
       if (!still) for (let i = 0; i < 70; i++) { const x = ((i * 53 + t * 0.06 * (1 + i % 3)) % CW), y = (i * 37) % SKY; ctx.fillStyle = '#e8b27a'; ctx.fillRect(x | 0, y, 2, 1); } }
-    if (!(moon && L === 0)) drawSun(...SUNPOS());
-    if (IMG.panels) { ctx.save(); if (s.tilt && dust > 0) { ctx.translate(314, SKY - 32); ctx.transform(1, 0, -0.35, 1, 0, 0); ctx.translate(-314, -(SKY - 32)); }
+    if (IMG.panels) { ctx.save(); const lean = s.tilt && dust > 0 ? -0.35 : Math.max(-0.22, Math.min(0.22, (314 - sun[0]) / 900)); // tilted for dust, or turned a little toward the Sun
+      if (lean) { ctx.translate(314, SKY - 32); ctx.transform(1, 0, lean, 1, 0, 0); ctx.translate(-314, -(SKY - 32)); }
       const dark = 1 - Math.min(1, L); ctx.drawImage(dark > 0.05 ? shadedPanels(dark * 0.65) : IMG.panels, 250, SKY - 64);
       if (!still && L > 0.5) { const gl = ((t / 2600) % 1.6) - 0.3; if (gl > 0 && gl < 1) ctx.drawImage(panelGlint(gl), 250, SKY - 64); } ctx.restore(); // sunlight glinting on the panels (only on the panels) // less sun: only the panels get darker, not a box around them
       if (!moon && s.clean < 0.9) { ctx.fillStyle = 'rgba(160,90,40,.55)'; ctx.fillRect(254, SKY - 58, 120, 30); } }
