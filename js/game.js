@@ -816,16 +816,55 @@
       hud(); });
     SFX.alarm();
   }
+  // Radio to Earth, in three steps: guess how long the answer takes, watch the signal fly there and back (a little map of
+  // space with a countdown), and keep working meanwhile: the answer arrives even with this window closed.
+  let RADIO = null; // the message on its way: { t0, secs, forFix, moon, km, done }
+  const LIGHT_FACTS = ['Radio is light: it could go around the Earth 7 times in 1 second.', 'Nothing is faster than light, and it is still this slow over space distances.',
+    'Rovers on Mars drive by themselves a lot, because waiting for every order would take too long.', 'The Moon is close: astronauts there can talk to Earth almost like on the phone.'];
   function radio(forFix) {
-    const moon = S.world === 'moon', lt = moon ? null : LightTime.earthMarsLightTime(new Date()), secs = moon ? 1.3 : Math.round(lt.seconds * 2 / 60), tip = hints()[0].text;
-    popup(`<h2>📡 ${mcLabel()}</h2>${moon ? '<p>The Moon is 384,400 km away. Radio takes <b>1.3 seconds</b>.</p>' : `<p>Today Mars is <b>${(lt.km / 1e6).toFixed(0)} million km</b> away. Radio takes <b>${Math.floor(lt.seconds / 60)} min ${r0(lt.seconds % 60)} s</b> each way.</p>`}
-      <div class="wave"><i id="sig" style="left:${moon ? 0 : 'calc(100% - 16px)'}"></i></div><div id="ans">${moon ? '' : `<p>📤 Question sent… the answer takes ${secs} minutes (${secs} seconds here). The base doesn’t wait!</p>`}</div>
-      <div class="src"><span class="tag2 calc">${moon ? 'REAL DELAY' : 'CALCULATED TODAY'}</span>${moon ? 'Earth–Moon distance ÷ speed of light.' : 'From NASA JPL planet orbits. 1 real minute = 1 second here.'}</div><button class="big primary" data-close>OK</button>`);
-    const done = () => { if (forFix) SIM.earthHelp(S); const a = $('ans'); if (a) a.innerHTML = mcSay(`<b>Answer:</b> ${forFix ? `Do steps 1 to 5 on the screen, ${CMD()}. One astronaut can fix it in 1 ${S.unit}.` : tip}`); if (a) bindRead(a); SFX.go(); };
-    if (moon) return setTimeout(done, 1300);
-    const t0 = performance.now();
-    (function anim(now) { const k = Math.min(1, (now - t0) / 1000 / secs), x = k < .5 ? 1 - k * 2 : (k - .5) * 2, sg = $('sig'); if (sg) sg.style.left = `calc(${(x * 100).toFixed(1)}% - ${(x * 16).toFixed(1)}px)`;
-      if (k < 1) requestAnimationFrame(anim); else { done(); if (forFix) FLOAT.push({ txt: '📡 Earth answered!', x: 192, y: 150, col: '#F0E442', t0: performance.now() }); } })(t0);
+    if (RADIO && !RADIO.done) return radioView(); // already on its way: show where it is
+    const moon = S.world === 'moon', lt = moon ? null : LightTime.earthMarsLightTime(new Date()), trip = moon ? 2.6 : Math.round(lt.seconds * 2 / 60);
+    const dist = moon ? '<p>The Moon is <b>384,400 km</b> away.</p>' : `<p>Today Mars is <b>${(lt.km / 1e6).toFixed(0)} million km</b> away.</p>`;
+    const opts = moon ? [['about 3 seconds', 1], ['20 minutes', 0], ['1 whole day', 0]] : [['1 second', 0], [`${trip} minutes`, 1], ['1 whole day', 0]];
+    popup(`<h2>📡 ${mcLabel()}</h2>${dist}<p><b>Quick guess!</b> Radio flies at the speed of light. How long until Earth's answer comes back?</p>
+      <div class="guess">${opts.map(o => `<button class="big" data-g="${o[1]}">${o[0]}</button>`).join('')}</div>`);
+    $('popcard').querySelectorAll('[data-g]').forEach(bt => bt.onclick = () => { const ok = bt.dataset.g === '1'; bt.classList.add(ok ? 'right' : 'wrong'); ok ? SFX.go() : SFX.tap();
+      $('popcard').querySelectorAll('[data-g]').forEach(x => { x.disabled = true; if (x.dataset.g === '1') x.classList.add('right'); });
+      const fb = ok ? '✅ Right!' : `Not quite: it takes ${moon ? 'about 3 seconds' : trip + ' minutes'} there and back.`;
+      setTimeout(() => { RADIO = { t0: performance.now(), secs: trip, forFix, moon, state: S, km: moon ? 0.3844 : lt.km / 1e6, done: false };
+        const R = RADIO; setTimeout(() => radioDone(R), trip * 1000); radioView(fb); }, 1100); });
+  }
+  function radioDone(R) {
+    if (R !== RADIO || R.done || R.state !== S) return; R.done = true; if (R.forFix) SIM.earthHelp(S); SFX.go();
+    const text = R.forFix ? `Do steps 1 to 5 on the screen, ${CMD()}. One astronaut can fix it in 1 ${S.unit}.` : hints()[0].text; R.text = text;
+    const a = $('ans'); if (a) { a.innerHTML = mcSay(`<b>Answer:</b> ${text}`); bindRead(a); const k = $('popcard').querySelector('[data-close]'); if (k) k.textContent = 'OK'; }
+    else { FLOAT.push({ txt: '📡 Earth answered!', x: 192, y: 150, col: '#F0E442', t0: performance.now() }); if (!R.forFix) showHint(hints()[0]); }
+    hud(); }
+  function radioView(fb) {
+    const R = RADIO;
+    popup(`<h2>📡 ${mcLabel()}</h2>${fb ? `<p class="rfb">${fb}</p>` : ''}<canvas id="rcv" class="radiocv" width="320" height="96" aria-label="Your radio message flying between your base and Earth"></canvas>
+      <p id="rstat" class="rstat"></p><p class="rfact">💡 ${LIGHT_FACTS[Math.floor(Math.random() * LIGHT_FACTS.length)]}</p><div id="ans"></div>
+      <div class="src"><span class="tag2 calc">${R.moon ? 'REAL DELAY' : 'CALCULATED TODAY'}</span>${R.moon ? 'Earth–Moon distance ÷ speed of light.' : 'From NASA JPL planet orbits. 1 real minute = 1 second here.'}</div>
+      <button class="big primary" data-close>${R.done ? 'OK' : '⏩ Keep working: the answer will come'}</button>`);
+    if (R.done) { $('ans').innerHTML = mcSay(`<b>Answer:</b> ${R.text}`); bindRead($('ans')); } // already here: show the answer again
+    const cv = $('rcv'), g = cv.getContext('2d'), EX = 34, PX = 288, Y = 50, stars = Array.from({ length: 40 }, (_, i) => [(i * 73) % 320, (i * 37) % 96, i % 3]);
+    const planet = (x, r, c1, c2) => { g.fillStyle = c1; g.beginPath(); g.arc(x, Y, r, 0, 6.283); g.fill(); g.fillStyle = c2; g.beginPath(); g.arc(x - r * 0.3, Y - r * 0.3, r * 0.45, 0, 6.283); g.fill(); };
+    (function frame(now) { if (!cv.isConnected) return;
+      const k = Math.min(1, (now - R.t0) / 1000 / R.secs), out = k < 0.5, f = out ? k * 2 : (k - 0.5) * 2, x = out ? PX - (PX - EX) * f : EX + (PX - EX) * f;
+      g.fillStyle = '#05070f'; g.fillRect(0, 0, 320, 96); stars.forEach(([sx, sy, b]) => { g.fillStyle = ['#3a4060', '#6a7090', '#c9d0ff'][b]; g.fillRect(sx, sy, 1, 1); });
+      g.strokeStyle = '#2b3150'; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(EX + 18, Y); g.lineTo(PX - 14, Y); g.stroke(); g.setLineDash([]);
+      planet(EX, 16, '#2f7fd8', '#3fa66b'); R.moon ? planet(PX, 9, '#9aa0ab', '#d2d6de') : planet(PX, 11, '#c1440e', '#e8743b');
+      g.font = 'bold 9px ui-monospace, Consolas, monospace'; g.textAlign = 'center'; g.fillStyle = '#cfd6ff'; g.fillText('EARTH', EX, 90); g.fillText(R.moon ? 'YOUR MOON BASE' : 'YOUR MARS BASE', PX - 14, 90);
+      if (k < 1) { const col = out ? '240,228,66' : '61,220,151', dir = out ? 1 : -1; // the pulse, its trail and radio rings
+        for (let i = 1; i < 8; i++) { g.fillStyle = `rgba(${col},${0.5 - i * 0.06})`; g.fillRect(x + dir * i * 5 - 1, Y - 1, 3, 3); }
+        for (let i = 0; i < 3; i++) { const rr = 4 + ((now / 120 + i * 4) % 12); g.strokeStyle = `rgba(${col},${1 - rr / 16})`; g.beginPath(); g.arc(x, Y, rr, dir > 0 ? 2.2 : -0.9, dir > 0 ? 4.1 : 0.9); g.stroke(); }
+        g.fillStyle = `rgb(${col})`; g.beginPath(); g.arc(x, Y, 3.5, 0, 6.283); g.fill();
+        const near = out ? f > 0.9 : f < 0.1; if (near) { g.strokeStyle = 'rgba(240,228,66,.8)'; g.beginPath(); g.arc(EX, Y, 20 + (now / 60) % 6, 0, 6.283); g.stroke(); } // Earth hears it / answers
+        g.fillStyle = '#F0E442'; g.fillText(`${(R.km * f).toFixed(R.moon ? 3 : 0)}${R.moon ? ' 000' : ' million'} km`, 160, 16); }
+      else { g.fillStyle = '#3ddc97'; g.fillText('ANSWER RECEIVED!', 160, 16); }
+      const left = Math.max(0, Math.ceil(R.secs * (1 - k))), st = $('rstat');
+      if (st) st.innerHTML = k >= 1 ? '📥 <b>Earth answered!</b>' : out ? `📤 Your question is flying to Earth… <b>${left} s</b> until the answer` : `📥 Earth's answer is flying back… <b>${left} s</b>`;
+      requestAnimationFrame(frame); })(performance.now());
   }
   $('radio').onclick = () => { SFX.tap(); radio(false); };
 
