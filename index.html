@@ -199,6 +199,22 @@
   .mg .pipe { background: #2b2f3a url(assets/pixellab/mg/steel.png) center / 100% 100%; image-rendering: pixelated; } .mg .pipe svg { filter: drop-shadow(0 2px 0 rgba(0,0,0,.6)); }
   .mg .pipe.wet { box-shadow: inset 0 0 0 999px rgba(30,90,160,.35); }
   .mg .tiles.panel .tile { background: #1d3a6b url(assets/pixellab/mg/solar.png) center / 100% 100%; image-rendering: pixelated; } .mg .tiles.panel .tile img { width: 90%; height: 90%; image-rendering: pixelated; display: block; margin: auto; }
+  /* new games: valve sequence, rock sorter, calm breathing (js/minigames.js) */
+  .valves { display: grid; grid-template-columns: repeat(3, calc(var(--cs) * 1.3)); gap: 10px; }
+  .valve { height: calc(var(--cs) * 1.3); border: 0; border-radius: 50%; background: #2b2f3a; box-shadow: inset 0 0 0 4px #555c6b; display: grid; place-items: center; }
+  .valve i { width: 62%; height: 62%; border-radius: 50%; background: var(--vc); opacity: .35; box-shadow: inset 0 0 0 5px rgba(0,0,0,.35); transition: opacity .1s, transform .1s; }
+  .valve.lit i { opacity: 1; transform: scale(1.12) rotate(45deg); box-shadow: 0 0 18px var(--vc), inset 0 0 0 5px rgba(255,255,255,.3); }
+  .sorter { display: grid; gap: 10px; justify-items: center; width: min(100%, 460px); }
+  .sample { display: flex; align-items: center; gap: 12px; background: var(--panel-2); box-shadow: 0 0 0 2px var(--line); padding: 10px 14px; width: 100%; font-weight: 700; }
+  .sample.in { animation: pop .35s ease-out; } .sample .rock { width: 44px; height: 34px; border-radius: 40% 55% 45% 50%; box-shadow: inset -6px -6px 0 rgba(0,0,0,.25), 0 0 0 2px #000; flex: none; }
+  .bins { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; }
+  .bin { min-height: 74px; border: 0; background: #2b2f3a; box-shadow: inset 0 0 0 2px var(--line); color: var(--ink); font-weight: 700; display: grid; place-items: center; padding: 6px; }
+  .bin .e { font-size: 1.6rem; } .bin.no { animation: shake .25s; }
+  .breath { position: relative; width: calc(var(--cs) * 4); height: calc(var(--cs) * 4); max-width: 86vw; max-height: 86vw; border: 0; border-radius: 50%; background: radial-gradient(#1d2944, #0d1426); display: grid; place-items: center; color: #fff; font-weight: 800; }
+  .breath .ring, .breath .band { position: absolute; inset: 6%; border-radius: 50%; pointer-events: none; }
+  .breath .band { inset: 2%; box-shadow: inset 0 0 0 10px rgba(61,220,151,.25); } .breath.ready .band { box-shadow: inset 0 0 0 10px rgba(61,220,151,.7); }
+  .breath .ring { box-shadow: inset 0 0 0 6px #56B4E9, 0 0 22px rgba(86,180,233,.6); }
+  .breath span { position: relative; z-index: 1; text-shadow: 0 1px 0 #000; }
   @keyframes pop { 0% { transform: scale(1); } 45% { transform: scale(1.18); } 100% { transform: scale(1); } }
   @keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
   @media (prefers-reduced-motion: reduce) { .burst, h2.cheer, .rate span.on, .mcard.done .front, .zc.head, .boxes i.good, .tip.show { animation: none; } }

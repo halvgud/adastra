@@ -65,8 +65,8 @@ JAMT_DATA.model = {
     crewPerTrip: 2, tripStars: 2, tripStarsTired: 1, labStars: 1,
     jobCap: { lab: 1, tend: 1, fix: 1 },
     // Room minigames: optional puzzles; winning gives a bonus when the day ends (never needed to win a mission).
-    minigame: { seconds: { lab: 75, trip: 150, regolith: 150, fix: 60, tend: 75, clean: 45 }, stars: 1, soilCm: 1, growDays: 2,
-      par: { lab: 40, trip: 70, regolith: 70, fix: 30, tend: 30, clean: 16 } }, // seconds for a 3-star "PERFECT!" (with no mistakes) // how many astronauts can do each job in a day (the rooms show "👤 n/1")
+    minigame: { seconds: { lab: 75, trip: 150, regolith: 150, fix: 60, tend: 75, clean: 45, valves: 90, sort: 75, breath: 70 }, stars: 1, soilCm: 1, growDays: 2,
+      par: { lab: 40, trip: 70, regolith: 70, fix: 30, tend: 30, clean: 16, valves: 45, sort: 30, breath: 40 } }, // seconds for a 3-star "PERFECT!" (with no mistakes) // how many astronauts can do each job in a day (the rooms show "👤 n/1")
     rationFactor: 0.75,                // small meals: the crew eats 75 % of the food, and trips find less science (like a tired crew)
     happyStar: 1, happyDays: 3,        // after a harvest: +1 ⭐ on science days, for 3 days
     tiredAt: 5,                        // days without anyone resting before trips find less science

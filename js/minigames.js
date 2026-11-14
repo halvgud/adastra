@@ -4,6 +4,7 @@
 // The words and facts are in data/text.js → minigames; the bonus and time limit for each one are in data/model.js → rules.minigame.
 //   lab       memory pairs              trip   route through every square, numbers in order (path puzzle)
 //   regolith  split the wall into boxes (area puzzle)   fix  turn pipes   tend  pick lettuces before they wilt   clean  wipe dust while wind blows
+//   valves    repeat a valve sequence (air maker)   sort  sort rock samples by their clue (lab)   breath  tap at the top of each breath (shelter)
 (function (root) {
   const shuffle = (R, a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const mistakes = (o, n, msg) => { o.miss = (o.miss || 0) + 1; if (o.miss >= n) o.lose(msg); else o.say(`${msg} (${n - o.miss} more mistake${n - o.miss > 1 ? 's' : ''} allowed)`); };
@@ -208,5 +209,65 @@
     const lose = o.lose; o.lose = m => { over = true; clearInterval(timer); lose(m); }; show();
   }
 
-  root.JAMT_MINI = { games: { lab, fix, trip, tend, regolith, clean } };
+
+  // 🔧 Air maker, second game: Valve sequence. Valves light up in an order; tap them in the same order. Each round adds one.
+  // A wrong valve is a mistake (3 allowed) and the round plays again. Win after 4 rounds (3, 4, 5 then 6 valves).
+  function valves(el, o) {
+    const R = o.rng, N = 6, ROUNDS = [3, 4, 5, 6], COLS = ['#e85d5d', '#f0b429', '#3ddc97', '#56B4E9', '#b07ce8', '#ff8fd0'];
+    const seq = Array.from({ length: 6 }, () => Math.floor(R() * N)); let round = 0, pos = 0, busy = true, over = false; const timers = [];
+    el.innerHTML = `<p class="mgq">Round <b id="mgr">1</b>/${ROUNDS.length} · <span id="mgw">watch…</span></p><div class="valves">${COLS.map((c, i) =>
+      `<button class="valve" data-i="${i}" style="--vc:${c}" aria-label="Valve ${i + 1}"><i></i></button>`).join('')}</div>`;
+    const btns = [...el.querySelectorAll('.valve')], later = (f, ms) => timers.push(setTimeout(() => { if (!over && el.isConnected) f(); }, ms));
+    const flash = (i, ms) => { btns[i].classList.add('lit'); later(() => btns[i].classList.remove('lit'), ms); };
+    const show = () => { busy = true; pos = 0; el.querySelector('#mgw').textContent = 'watch…'; const n = ROUNDS[round];
+      for (let k = 0; k < n; k++) later(() => { flash(seq[k], 420); o.tap(); }, 600 + k * 620);
+      later(() => { busy = false; el.querySelector('#mgw').textContent = 'your turn!'; }, 600 + n * 620); };
+    btns.forEach((b, i) => b.onclick = () => { if (busy || over) return; flash(i, 220);
+      if (i !== seq[pos]) { mistakes(o, 3, 'Wrong valve! Watch again.'); if (!over) later(show, 500); return; }
+      o.tap(); pos += 1; if (pos < ROUNDS[round]) return;
+      round += 1; if (round >= ROUNDS.length) { over = true; setTimeout(o.win, 400); return; }
+      el.querySelector('#mgr').textContent = round + 1; later(show, 500); });
+    const lose = o.lose; o.lose = m => { over = true; timers.forEach(clearTimeout); lose(m); };
+    show();
+  }
+
+  // 🔬 Lab, second game: Rock sorter. A sample comes in with a clue; put it in the right box. 10 right answers win.
+  // A wrong box is a mistake (3 allowed). Real kinds of rock and ice found on the Moon and Mars.
+  function sort(el, o) {
+    const R = o.rng, GOAL = 10, KINDS = [
+      { id: 'basalt', name: 'Dark lava rock', icon: '🌋', clues: ['Dark grey, full of tiny holes from gas bubbles', 'Came from old lava flows on the plains', 'Heavy and dark, cooled from melted rock'], col: '#3b3d45' },
+      { id: 'bright', name: 'Bright highland rock', icon: '⛰️', clues: ['Almost white, from the high mountains', 'Light and bright, with shiny crystals', 'Very old, pale rock from the highlands'], col: '#d9d6cc' },
+      { id: 'ice', name: 'Ice', icon: '🧊', clues: ['Melts if it gets warm!', 'Found in dark craters that never see the Sun', 'Clear and cold: it can become drinking water'], col: '#bfe8ff' }];
+    let n = 0, cur = null, last = -1, over = false;
+    el.innerHTML = `<p class="mgq">Sorted: <b id="mgn">0</b>/${GOAL}</p><div class="sorter"><div class="sample" id="mgs"><i class="rock"></i><span id="mgc"></span></div>
+      <div class="bins">${KINDS.map((k, i) => `<button class="bin" data-i="${i}"><span class="e">${k.icon}</span>${k.name}</button>`).join('')}</div></div>`;
+    const next = () => { let i; do i = Math.floor(R() * 3); while (i === last && R() < 0.6); last = i; const k = KINDS[i]; cur = i;
+      el.querySelector('#mgc').textContent = k.clues[Math.floor(R() * k.clues.length)]; const rk = el.querySelector('.rock'); rk.style.background = k.col;
+      const s = el.querySelector('#mgs'); s.classList.remove('in'); void s.offsetWidth; s.classList.add('in'); };
+    el.querySelectorAll('.bin').forEach(b => b.onclick = () => { if (over) return; const i = +b.dataset.i;
+      if (i !== cur) { b.classList.remove('no'); void b.offsetWidth; b.classList.add('no'); mistakes(o, 3, 'Not that one. Read the clue again!'); return; }
+      o.tap(); n += 1; el.querySelector('#mgn').textContent = n; if (n >= GOAL) { over = true; setTimeout(o.win, 300); return; } next(); });
+    const lose = o.lose; o.lose = m => { over = true; lose(m); };
+    next();
+  }
+
+  // 😴 Shelter: Calm breathing. A ring slowly grows (breathe in) and shrinks (breathe out). Tap when it is at its biggest,
+  // inside the glowing band. 8 calm breaths win; a tap at the wrong moment is a mistake (3 allowed).
+  function breath(el, o) {
+    const GOAL = 8, PERIOD = 4200; let n = 0, over = false, lastHit = -1e9; const t0 = performance.now();
+    el.innerHTML = `<p class="mgq">Calm breaths: <b id="mgn">0</b>/${GOAL}</p><button class="breath" aria-label="Tap when the ring is biggest"><i class="band"></i><i class="ring"></i><span id="mgb">breathe in…</span></button>`;
+    const ring = el.querySelector('.ring'), word = el.querySelector('#mgb'), size = t => 0.35 + 0.65 * (0.5 - 0.5 * Math.cos((t - t0) / PERIOD * 2 * Math.PI));
+    const tick = () => { if (over || !el.isConnected) return; const now = performance.now(), s = size(now); ring.style.transform = `scale(${s})`;
+      const inn = Math.sin((now - t0) / PERIOD * 2 * Math.PI) > 0; word.textContent = s > 0.88 ? 'tap now!' : inn ? 'breathe in…' : 'breathe out…'; el.querySelector('.breath').classList.toggle('ready', s > 0.88); requestAnimationFrame(tick); };
+    el.querySelector('.breath').onclick = () => { if (over) return; const now = performance.now(), s = size(now);
+      if (s > 0.88) { if (now - lastHit < PERIOD * 0.6) return; // extra taps in the same breath are simply ignored
+        lastHit = now; n += 1; o.tap(); el.querySelector('#mgn').textContent = n; if (n >= GOAL) { over = true; setTimeout(o.win, 300); } }
+      else mistakes(o, 3, 'Wait until the ring is biggest.'); };
+    const lose = o.lose; o.lose = m => { over = true; lose(m); };
+    requestAnimationFrame(tick);
+  }
+
+  root.JAMT_MINI = { games: { lab, fix, trip, tend, regolith, clean, valves, sort, breath },
+    // which games each job offers (a room shows a Play button for each; winning any one gives that job's bonus)
+    byJob: { lab: ['lab', 'sort'], fix: ['fix', 'valves'], trip: ['trip'], tend: ['tend'], regolith: ['regolith'], clean: ['clean'], rest: ['breath'] } };
 })(window);

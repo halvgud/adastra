@@ -74,6 +74,7 @@
     if (mg.trip && trips) { stars += MG.stars; say.push(`🎮 Best samples collected: +${MG.stars} ⭐`); }
     if (mg.clean && did('clean')) { stars += MG.stars; say.push(`🎮 Spotless panels: +${MG.stars} ⭐`); }
     if (mg.regolith && did('regolith')) { s.shelter += MG.soilCm; say.push(`🎮 A neat wall: +${MG.soilCm} cm of soil`); }
+    if (mg.rest && did('rest')) { stars += MG.stars; say.push(`🎮 A calm, deep rest: +${MG.stars} ⭐`); }
     if (mg.tend && did('tend')) { s.grow += MG.growDays; say.push(`🎮 A careful harvest: the lettuce grew ${MG.growDays} extra days`); }
     if (mg.fix && did('fix') && s.broken) { s.broken = false; s.fixProg = 0; s.fixHelp = false; s.wear = 0; say.push('🎮 Pipes connected: the water recycler works again!'); }
     else if (mg.fix && did('fix')) { stars += MG.stars; say.push(`🎮 Every pipe checked: +${MG.stars} ⭐`); } // a check-up puzzle (nothing broken): a star, like the other rooms

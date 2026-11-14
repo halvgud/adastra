@@ -86,6 +86,13 @@ JAMT_DATA.text = {
       fact: 'About 7 cm of moon soil cuts the dose of a big solar storm to half of NASA’s 30-day limit. That is the yellow “safe” line in your shelter.', src: 'dlr_shielding' },
     clean: { title: '🧽 Windy panels', how: 'Wipe the dust 🟫 off the solar panels. The wind keeps blowing more in for a while: keep going until it stops!',
       fact: 'Global dust storms on Mars happen about once every three Mars years, and they can last for weeks or months.', src: 'nasa_dust_storms' },
+    // second games (a room shows a Play button for each; winning any one gives the job's bonus)
+    valves: { title: '🔧 Valve sequence', how: 'Watch the valves light up, then tap them in the same order. Each round adds one more!',
+      fact: 'With the water recycler broken, four astronauts would lose about 18 kg of water every day.', src: 'model' },
+    sort: { title: '🔬 Rock sorter', how: 'Read the clue and put each sample in the right box: dark lava rock, bright highland rock, or ice.',
+      fact: 'Between 1969 and 1972, six Apollo missions brought 382 kg of Moon rocks, sand and dust home for scientists to study.', src: 'apollo_samples' },
+    breath: { title: '😴 Calm breathing', how: 'Breathe with the ring. Tap when it is at its biggest, once for each breath.',
+      fact: 'In one NASA study, 14 volunteers stayed in bed for 21 days, so scientists could see how muscles change when they are not used.', src: 'osdr_bedrest' },
   },
 
   // Real NASA studies from OSDR (archived copy, see data/sources.js), shown in rooms on alternate days next to the room's fact.

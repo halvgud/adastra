@@ -84,7 +84,10 @@
     if (VOICE) { u.voice = VOICE; u.lang = VOICE.lang; } else u.pitch = (T.missionControl || {}).pitch || 1;
     u.onend = u.onerror = () => { HOLD = false; }; HOLD = true; speechSynthesis.speak(u); } catch (e) { HOLD = false; } }
   const hush = () => { HOLD = false; if (canSpeak) try { speechSynthesis.cancel(); } catch (e) {} };
-  const words = el => el.innerText || el.textContent; // innerText keeps the pauses between paragraphs
+  // What the read-aloud button says: the message only. Skip the speaker's name label (.mcname) and a leading "Answer:"-style tag.
+  const words = el => { const c = el.cloneNode(true); c.querySelectorAll('.mcname').forEach(n => n.remove());
+    document.body.appendChild(c); c.style.cssText = 'position:absolute;left:-9999px;top:0'; const txt = (c.innerText || c.textContent || '').trim(); c.remove(); // innerText keeps the pauses between paragraphs
+    return txt.replace(/^[A-Z][A-Za-z ]{1,20}:\s*/, ''); };
   const bindRead = root => root.querySelectorAll('.read').forEach(b => b.onclick = () => speak(words(b.closest('.mc').querySelector('.bubble'))));
   $('coachread').onclick = () => speak(words($('coachtxt')));
   // While the Mission Control box is open, the page gets that much extra room at the bottom, so you can scroll past it.
@@ -519,15 +522,16 @@
 
   // ---------- room minigames (js/minigames.js; words in data/text.js → minigames; bonus in data/model.js → rules.minigame) ----------
   const MGR = RU.minigame || {};
-  function miniReady(j) { const G = window.JAMT_MINI && JAMT_MINI.games[j] && T.minigames && T.minigames[j];
-    if (!G || !S.jobs.includes(j) || (S.mgTried || {})[j] === S.day) return false;
+  // The games a job offers today (js/minigames.js → byJob): each one can be tried once a day.
+  const gamesFor = j => (((window.JAMT_MINI || {}).byJob || {})[j] || [j]).filter(g => JAMT_MINI.games[g] && T.minigames && T.minigames[g] && (S.mgTried || {})[g] !== S.day);
+  function miniReady(j) { if (!window.JAMT_MINI || !S.jobs.includes(j) || (S.mg || {})[j] || !gamesFor(j).length) return false; // the job's bonus can be won once a day
     // fix: when broken, winning finishes the repair; when not, it is a check-up and gives a star
     if (j === 'trip') return S.jobs.filter(x => x === 'trip').length >= RU.crewPerTrip;
     if (j === 'lab') return S.sw.lab && !S.sw.save;         // a dark lab gives no science, puzzle or not
     return true; }
   const miniBonus = j => ({ fix: S && S.broken ? 'the repair is finished' : `+${MGR.stars} ⭐`, regolith: `+${MGR.soilCm} cm of soil`, tend: `the lettuce grows ${MGR.growDays} extra days` }[j] || `+${MGR.stars} ⭐`);
-  function playMini(j) {
-    const G = T.minigames[j], src = DATA.sources[G.src]; S.mgTried = S.mgTried || {}; S.mgTried[j] = S.day; let over = false;
+  function playMini(v) { // v = 'job.game' (or just 'job')
+    const [j, g0] = v.split('.'), g = g0 || j, G = T.minigames[g], src = DATA.sources[G.src]; S.mgTried = S.mgTried || {}; S.mgTried[g] = S.day; let over = false;
     popup(`<h2>${G.title}</h2>${mcSay(G.how)}${timerBox()}<div class="mg" id="mg"></div><div class="tip" id="mgtip"></div>
       <button class="big" id="mgskip"><span class="e">⏭</span><span>Not now<small>the job still gets done, without the bonus</small></span></button><span data-must></span>`);
     $('popcard').classList.add(S.world); // moon or mars: the puzzle art matches the world (index.html)
@@ -536,10 +540,10 @@
     // a personal best time and a streak of puzzles won in a row. Bonuses in the game stay the same: this is just for fun.
     const T0 = performance.now(); let combo = 0;
     const end = (win, msg) => { if (over) return; over = true; clearTimer();
-      const secs = Math.round((performance.now() - T0) / 1000), miss = o.miss || 0, par = (MGR.par || {})[j] || 40;
+      const secs = Math.round((performance.now() - T0) / 1000), miss = o.miss || 0, par = (MGR.par || {})[g] || 40;
       const rate = !win ? 0 : miss === 0 && secs <= par ? 3 : miss <= 2 && secs <= par * 1.6 ? 2 : 1;
       let best = {}; try { best = JSON.parse(store.get('jamt-best') || '{}') || {}; } catch (e) {}
-      const record = win && (!best[j] || secs < best[j]); if (record) { best[j] = secs; store.set('jamt-best', JSON.stringify(best)); }
+      const record = win && (!best[g] || secs < best[g]); if (record) { best[g] = secs; store.set('jamt-best', JSON.stringify(best)); }
       const streak = win ? (+store.get('jamt-streak') || 0) + 1 : 0; store.set('jamt-streak', String(streak));
       if (win) { S.mg = S.mg || {}; S.mg[j] = true; }
       // Puzzle won: first a 10-second first-person scene of the job (js/eva.js), then the result card. Tap or "Skip" to jump ahead.
@@ -559,7 +563,7 @@
       const burst = win && !still ? `<div class="burst" aria-hidden="true">${Array.from({ length: 28 }, (_, i) => `<i style="--x:${Math.round(Math.cos(i * 2.4) * (90 + (i * 37) % 120))}px;--y:${Math.round(Math.sin(i * 2.4) * (70 + (i * 53) % 110))}px;--r:${(i * 47) % 360}deg;background:${['#F0E442', '#56B4E9', '#009E73', '#CC79A7', '#E69F00'][i % 5]};animation-delay:${(i % 7) * 25}ms"></i>`).join('')}</div>` : '';
       popup(`${burst}<h2 class="${win ? 'cheer' : ''}">${win ? `🎉 ${praise}` : '👍 Good try!'}</h2>
         ${win ? `<div class="rate" aria-label="${rate} of 3 stars">${[0, 1, 2].map(i => `<span class="${i < rate ? 'on' : ''}" style="animation-delay:${650 + i * 330}ms">★</span>`).join('')}</div>
-          <p class="wins">⏱ ${secs} s${record ? ' · <b class="rec">🏆 New best time!</b>' : best[j] ? ` · best ${best[j]} s` : ''}${streak > 1 ? ` · 🔥 <b>${streak} in a row!</b>` : ''}</p>` : ''}
+          <p class="wins">⏱ ${secs} s${record ? ' · <b class="rec">🏆 New best time!</b>' : best[g] ? ` · best ${best[g]} s` : ''}${streak > 1 ? ` · 🔥 <b>${streak} in a row!</b>` : ''}</p>` : ''}
         ${mcSay(win ? `You did it, ${CMD()}! Bonus: <b>${miniBonus(j)}</b> when the ${S.unit} ends.` : `${msg || 'Time is up.'} The job still gets done today. You can try again tomorrow.`)}
         <div class="fact"><span class="tag2 real">REAL</span>${G.fact}</div><div class="src">${src ? src.name : ''} · the puzzle itself is a game.</div>
         <button class="big primary" data-close>OK</button>`); hud(); } };
@@ -567,8 +571,8 @@
     $('mgskip').onclick = () => { over = true; clearTimer(); SFX.tap(); closeAll(); hud(); };
     const o = { rng: SIM.rng(S.code * 97 + S.day * 7 + j.length), win: () => end(true), lose: m => end(false, m), say,
       tap: () => { combo += 1; beep([[523 * Math.pow(2, Math.min(combo, 15) / 12), .06]], 'square', .045); } };
-    JAMT_MINI.games[j]($('mg'), o);
-    countdown((MGR.seconds || {})[j] || 60, () => end(false, 'Time is up!'));
+    JAMT_MINI.games[g]($('mg'), o);
+    countdown((MGR.seconds || {})[g] || 60, () => end(false, 'Time is up!'));
   }
 
   // ---------- HUD, forecast, crew bar ----------
@@ -636,8 +640,8 @@
     if (r.id === 'battery') acts.push(['sw:save', s.sw.save ? '🌙' : '☀️', `Power-save ${s.sw.save ? 'ON' : 'OFF'}`, `uses ${r0((1 - RU.saveFactor) * 100)} % less, but the lab stops · battery ${r0(Math.max(0, s.batt))}/${s.cap} kWh`, s.sw.save]);
     const here = S.jobs.map((j, k) => j && roomFor(j) === r.id ? k : -1).filter(k => k >= 0);
     // a minigame for each job someone is doing here today (one try per job per day)
-    [...new Set(here.map(k => S.jobs[k]))].filter(miniReady).forEach(j => { const G = T.minigames[j];
-      acts.unshift([`mg:${j}`, '🎮', `Play: ${G.title.replace(/^\S+\s/, '')}`, `a short puzzle · win: ${miniBonus(j)} when the ${s.unit} ends`, false, 'mg']); });
+    [...new Set(here.map(k => S.jobs[k]))].filter(miniReady).forEach(j => gamesFor(j).reverse().forEach(g => { const G = T.minigames[g];
+      acts.unshift([`mg:${j}.${g}`, '🎮', `Play: ${G.title.replace(/^\S+\s/, '')}`, `a short puzzle · win: ${miniBonus(j)} when the ${s.unit} ends`, false, 'mg']); }));
     const C = roomCtx(view.room);
     $('panel').innerHTML = `<div class="ctx"><b>${r.icon} ${r.about}</b><div class="stats">${C.stats.map(x => `<span>${x}</span>`).join('')}</div>${C.whatif ? `<p class="whatif">${C.whatif}</p>` : ''}${C.fact ? `<div class="fact"><span class="tag2 real">${C.factTag}</span>${C.fact}</div>` : ''}</div>` +
       acts.map(([id, e, t, sub, on, cls]) => `<button class="big ${on ? 'on' : ''} ${cls || ''}" data-a="${id}"><span class="e">${e}</span><span>${t}<small>${sub}</small></span></button>`).join('') +
