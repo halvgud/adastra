@@ -190,6 +190,15 @@
   @keyframes flyup { 0% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -26px); } }
   @keyframes wig { 50% { transform: rotate(14deg) translateX(2px); } }
   @media (prefers-reduced-motion: reduce) { .tile.pot.ripe .pl, .tile.pot.hasbug .bug, .tile.pot .fly.go, .tile.pot.no { animation: none; } .tile.pot .fly.go { opacity: 1; } }
+  /* Minigame art (PixelLab pictures in assets/pixellab/mg/). The world class (moon / mars) is set on the card by js/game.js.
+     Selectors start with .mg so they win over the plain board styles further down. */
+  .mg .mcard .back { background: #23305a url(assets/pixellab/mg/cardback.png) center / 100% 100%; image-rendering: pixelated; color: transparent; }
+  .mg .zip { background: linear-gradient(rgba(0,0,0,.28), rgba(0,0,0,.28)), url(assets/pixellab/mg/ground-moon.png) 0 0 / calc(var(--cs) * 2) calc(var(--cs) * 2); background-color: #2b2f3a; image-rendering: pixelated; }
+  .mars .mg .zip { background-image: linear-gradient(rgba(0,0,0,.28), rgba(0,0,0,.28)), url(assets/pixellab/mg/ground-mars.png); }
+  .mg .boxes i.good { background: url(assets/pixellab/mg/sandbag.png) 0 0 / var(--cs) var(--cs); image-rendering: pixelated; }
+  .mg .pipe { background: #2b2f3a url(assets/pixellab/mg/steel.png) center / 100% 100%; image-rendering: pixelated; } .mg .pipe svg { filter: drop-shadow(0 2px 0 rgba(0,0,0,.6)); }
+  .mg .pipe.wet { box-shadow: inset 0 0 0 999px rgba(30,90,160,.35); }
+  .mg .tiles.panel .tile { background: #1d3a6b url(assets/pixellab/mg/solar.png) center / 100% 100%; image-rendering: pixelated; } .mg .tiles.panel .tile img { width: 90%; height: 90%; image-rendering: pixelated; display: block; margin: auto; }
   @keyframes pop { 0% { transform: scale(1); } 45% { transform: scale(1.18); } 100% { transform: scale(1); } }
   @keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
   @media (prefers-reduced-motion: reduce) { .burst, h2.cheer, .rate span.on, .mcard.done .front, .zc.head, .boxes i.good, .tip.show { animation: none; } }

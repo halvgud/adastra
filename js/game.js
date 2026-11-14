@@ -117,7 +117,13 @@
   const IMG = {}; const load = (k, src) => new Promise(res => { const i = new Image(); i.onload = () => { IMG[k] = i; res(); }; i.onerror = () => res(); i.src = src; });
   const SPR = { walk: [], idle: [], face: [], back: [], act: {} };
   // Action animations made with PixelLab (assets/pixellab/astronaut/Idle/animations/<name>/<direction>/frame_00N.png)
-  const ACTS = { pick: 'east', dig: 'east', wipe: 'east', type: 'north' }, ACT_FRAMES = 9;
+  const ACTS = { pick: 'east', dig: 'east', wipe: 'east', type: 'north', sleep: 'east', water: 'east', repair: 'east', cheer: 'east' }, ACT_FRAMES = 9;
+  const JOBANIM = { rest: 'sleep', tend: 'water', fix: 'repair' }; // what an astronaut does in their room
+  // The frame of an action animation for astronaut k, or null. sleep: lie down, then breathe (frames 6-8). cheer: plays once from CHEER[k].
+  function actFrame(k, name, t) { const f = ((SPR.act[name] || [])[k]) || []; if (!f.length) return null;
+    if (name === 'sleep') return f[Math.min(f.length - 1, 6 + [0, 1, 2, 1][Math.floor(t / 600 + k) % 4])];
+    if (name === 'cheer') { const e = t - (CHEER[k] || -1e9); return e >= 0 && e < f.length * 140 ? f[Math.floor(e / 140)] : null; }
+    return f[Math.floor(t / 140 + k * 3) % f.length]; }
   function canvasOf(img) { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').drawImage(img, 0, 0); return c; }
   function keyOut(img) {
     const c = canvasOf(img), g = c.getContext('2d'); let d; try { d = g.getImageData(0, 0, c.width, c.height); } catch (e) { return c; }
@@ -286,12 +292,16 @@
       if (moving) { p.x += Math.sign(dx) * Math.min(Math.abs(dx), job ? 0.6 : 0.9); p.facing = Math.sign(dx); } else p.x = p.tx;
       const md = MOODS[k], live = md && t >= md.t0 && t - md.t0 < 4200, hop = live && md.hop && !still && t - md.t0 < 1800 ? Math.abs(Math.sin((t - md.t0) / 110)) * 7 : 0;
       const fr = (moving ? SPR.walk[k] : SPR.idle[k]) || []; if (!fr.length) return;
+      const cheer = !still && actFrame(k, 'cheer', t); // just won a puzzle, or was tapped: a happy jump
+      if (cheer) { drawSprite(cheer, p.x, ry + RH - 9, p.facing, 1); if (k === 0) text('★', p.x, ry + RH - 52, '#ff9a3c', 9); return; }
       if (job === 'rest' && !still) { // lying down for a nap
-        const lx = Math.max(rx + 40, Math.min(rx + RW - 40, p.x)), breathe = Math.sin(t / 700 + k) * 0.6; p.x = lx; ctx.save(); ctx.translate(lx, ry + RH - 22 + breathe); ctx.rotate(-Math.PI / 2); ctx.drawImage(fr[0], -30, -30, 60, 60); ctx.restore();
+        const lx = Math.max(rx + 40, Math.min(rx + RW - 40, p.x)), sl = actFrame(k, 'sleep', t); p.x = lx;
+        if (sl) drawSprite(sl, lx, ry + RH - 9, p.facing, 1); else { const breathe = Math.sin(t / 700 + k) * 0.6; ctx.save(); ctx.translate(lx, ry + RH - 22 + breathe); ctx.rotate(-Math.PI / 2); ctx.drawImage(fr[0], -30, -30, 60, 60); ctx.restore(); }
         const zph = (t / 1600 + k * 0.3) % 1; ctx.globalAlpha = 1 - zph; text('z', p.x + 12 + zph * 10, ry + RH - 40 - zph * 22, '#cfe3ff', 9 + zph * 6); ctx.globalAlpha = 1;
         if (k === 0) text('★', p.x - 22, ry + RH - 34, '#ff9a3c', 9); return; }
       const work = !moving && !still && job ? Math.abs(Math.sin(t / 180 + k)) * 1.5 : 0; // a small busy bob while working
-      drawSprite(fr[Math.floor(t / (moving ? 110 : 260)) % fr.length], p.x, ry + RH - 9 - hop - work, p.facing, 1);
+      const busy = !moving && !still && JOBANIM[job] && actFrame(k, JOBANIM[job], t); // watering, repairing
+      drawSprite(busy || fr[Math.floor(t / (moving ? 110 : 260)) % fr.length], p.x, ry + RH - 9 - hop - (busy ? 0 : work), p.facing, 1);
       if (!moving && !still) jobFx(t, k, job, p.x + p.facing * 14, ry + RH - 34);
       if (k === 0) text('★', p.x, ry + 16 - hop, '#ff9a3c', 9); if (selected === k) { ctx.fillStyle = '#F0E442'; ctx.fillRect(p.x - 3, ry + 4, 6, 6); }
       if (live) { const by = ry + 2 - hop; ctx.fillStyle = '#fff'; ctx.fillRect(p.x - 9, by - 13, 18, 15); ctx.fillRect(p.x - 2, by + 2, 4, 3); ctx.fillStyle = '#000'; ctx.fillRect(p.x - 9, by - 13, 18, 1);
@@ -345,9 +355,11 @@
     if (r.id === 'oxygen' && s.broken) text('💥 RECYCLER BROKEN', 192, 300, '#ff7a3c', 15);
     C.lines.forEach((ln, i) => text(ln, 192, (r.id === 'greenhouse' ? 318 : 306) + i * 18, '#fff', 13));
     const here = S.jobs.map((j, kk) => j && roomFor(j) === r.id ? kk : -1).filter(kk => kk >= 0);
-    here.forEach((kk, i) => { const fr = SPR.idle[kk] || [], jt = t - (JUMP[kk] || -9999), hop = jt < 500 && !still ? Math.sin(jt / 500 * Math.PI) * 26 : 0; // tapped: a little jump
-      if (S.jobs[kk] === 'lab' && SPR.back[kk]) { atComputer(t, kk, hop); return; }
-      if (fr.length) drawSprite(fr[Math.floor(t / 260) % fr.length], 70 + i * 90, 274 - hop, 1, 2); });
+    here.forEach((kk, i) => { const fr = SPR.idle[kk] || [], jt = t - (JUMP[kk] || -9999), cheer = !still && actFrame(kk, 'cheer', t);
+      const hop = !cheer && jt < 500 && !still ? Math.sin(jt / 500 * Math.PI) * 26 : 0; // tapped: a happy jump (or a little hop)
+      if (!cheer && S.jobs[kk] === 'lab' && SPR.back[kk]) { atComputer(t, kk, hop); return; }
+      const busy = !still && JOBANIM[S.jobs[kk]] && actFrame(kk, JOBANIM[S.jobs[kk]], t);
+      const f = cheer || busy || (fr.length ? fr[Math.floor(t / 260) % fr.length] : null); if (f) drawSprite(f, 70 + i * 90, 274 - hop, 1, 2); });
   }
   // Lab work: the astronaut stands at the big computer, seen from behind, typing. The screen scrolls data and keys flash.
   const PC = { x: 182, foot: 272, scr: [152, 124, 60, 40], keysY: 196 }; // where the astronaut stands, the main screen (x, y, w, h) and the keyboard row, in the zoomed lab
@@ -379,7 +391,7 @@
   function loop(t) { if (S) { if (view.mode === 'room') drawRoom(t, view.room, still ? 1 : Math.min(1, (t - view.t0) / 280)); else { drawBase(t); drawBanner(t); } drawPokes(t); drawFloats(t); drawFX(t); aiMark(); } requestAnimationFrame(loop); }
 
   // ---------- tap the scene: things react (a small burst, a sound, sometimes a real number) ----------
-  let POKES = []; const JUMP = {};
+  let POKES = []; const JUMP = {}, CHEER = {}; // CHEER[k] = when astronaut k started a happy jump
   const POKE_KIND = { oxygen: 'bubble', greenhouse: 'leaf', lab: 'spark', battery: 'zap', shelter: 'dust', airlock: 'star' };
   function poke(x, y, kind) { POKES.push({ x, y, kind, t0: performance.now() }); if (POKES.length > 12) POKES.shift(); }
   function drawPokes(t) { POKES = POKES.filter(p => t - p.t0 < 900); POKES.forEach(p => { const k = (t - p.t0) / 900;
@@ -390,7 +402,7 @@
   cv.addEventListener('pointerdown', e => { if (!S) return; const b = cv.getBoundingClientRect(), x = (e.clientX - b.left) * CW / b.width, y = (e.clientY - b.top) * CH / b.height;
     if (view.mode === 'room') { const r = ROOMS[view.room], here = S.jobs.map((j, k) => j && roomFor(j) === r.id ? k : -1).filter(k => k >= 0);
       const hit = here.findIndex((k, i) => Math.abs(x - (70 + i * 90)) < 34 && y > 160 && y < 290);
-      if (hit >= 0) { const k = here[hit]; JUMP[k] = performance.now(); const L = T.crewLines || ['Hi!']; FLOAT.push({ txt: `${k === 0 ? 'Me' : CREW[k].name}: ${L[Math.floor(Math.random() * L.length)]}`, x: 70 + hit * 90, y: 150, col: '#fff', t0: performance.now() }); beep([[660, .05], [880, .07]], 'square', .04); return; }
+      if (hit >= 0) { const k = here[hit]; JUMP[k] = CHEER[k] = performance.now(); const L = T.crewLines || ['Hi!']; FLOAT.push({ txt: `${k === 0 ? 'Me' : CREW[k].name}: ${L[Math.floor(Math.random() * L.length)]}`, x: 70 + hit * 90, y: 150, col: '#fff', t0: performance.now() }); beep([[660, .05], [880, .07]], 'square', .04); return; }
       if (y > 40 && y < 280) { poke(x, y, POKE_KIND[r.id] || 'star'); beep([[500 + Math.random() * 500, .05]], 'triangle', .05); } return; }
     // base view: the sky part of the scene (the rooms below have their own buttons)
     const moon = S.world === 'moon';
@@ -447,6 +459,7 @@
     const G = T.minigames[j], src = DATA.sources[G.src]; S.mgTried = S.mgTried || {}; S.mgTried[j] = S.day; let over = false;
     popup(`<h2>${G.title}</h2>${mcSay(G.how)}${timerBox()}<div class="mg" id="mg"></div><div class="tip" id="mgtip"></div>
       <button class="big" id="mgskip"><span class="e">⏭</span><span>Not now<small>the job still gets done, without the bonus</small></span></button><span data-must></span>`);
+    $('popcard').classList.add(S.world); // moon or mars: the puzzle art matches the world (index.html)
     $('popcard').classList.add('mgcard'); // a wider card: the boards scale with the screen (index.html → .mg --cs)
     // Rewards: every good move plays a note a little higher (a combo); a mistake resets it. Winning gives 1–3 stars,
     // a personal best time and a streak of puzzles won in a row. Bonuses in the game stay the same: this is just for fun.
@@ -468,7 +481,8 @@
         return; }
       show();
       function show() {
-      if (win) { SFX.win(); FX = { kind: 'confetti', t0: performance.now(), dur: 2200 };
+      // the astronauts on that job jump for joy (CHEER), with confetti and star chimes
+      if (win) { S.jobs.forEach((jj, k) => { if (jj === j) CHEER[k] = performance.now() + 300; }); SFX.win(); FX = { kind: 'confetti', t0: performance.now(), dur: 2200 };
         for (let i = 0; i < rate; i++) setTimeout(() => beep([[784 * Math.pow(2, i * 4 / 12), .09], [1047 * Math.pow(2, i * 4 / 12), .14]], 'square', .05), 650 + i * 330); } else SFX.lose();
       const praise = ['Good job!', 'Great work!', 'PERFECT!'][rate - 1] || 'Good try!';
       const burst = win && !still ? `<div class="burst" aria-hidden="true">${Array.from({ length: 28 }, (_, i) => `<i style="--x:${Math.round(Math.cos(i * 2.4) * (90 + (i * 37) % 120))}px;--y:${Math.round(Math.sin(i * 2.4) * (70 + (i * 53) % 110))}px;--r:${(i * 47) % 360}deg;background:${['#F0E442', '#56B4E9', '#009E73', '#CC79A7', '#E69F00'][i % 5]};animation-delay:${(i % 7) * 25}ms"></i>`).join('')}</div>` : '';
@@ -617,7 +631,7 @@
   // ---------- popups with Mission Control ----------
   const mcSay = html => `<div class="mc"><span class="aiwrap"><img src="${MCIMG}" data-mc alt="${mcLabel()}"><i class="aitag">AI</i></span><div class="bubble"><div class="mcname">${mcLabel()}</div>${html}</div><button class="read" aria-label="Read this aloud">🔊</button></div>`;
   let timerId = null;
-  function popup(html) { clearTimer(); hush(); $('popcard').classList.remove('mgcard'); $('popcard').innerHTML = html; $('pop').classList.add('show'); $('popcard').querySelectorAll('[data-close]').forEach(b => b.onclick = closeAll); bindWords($('popcard'));
+  function popup(html) { clearTimer(); hush(); $('popcard').classList.remove('mgcard', 'moon', 'mars'); $('popcard').innerHTML = html; $('pop').classList.add('show'); $('popcard').querySelectorAll('[data-close]').forEach(b => b.onclick = closeAll); bindWords($('popcard'));
     bindRead($('popcard'));
     const b = $('popcard').querySelector('button.primary') || $('popcard').querySelector('input') || $('popcard').querySelector('button'); if (b) b.focus(); }
   function closeAll() { clearTimer(); hush(); $('pop').classList.remove('show'); }
