@@ -119,8 +119,18 @@
   // Action animations made with PixelLab (assets/pixellab/astronaut/Idle/animations/<name>/<direction>/frame_00N.png)
   const ACTS = { pick: 'east', dig: 'east', wipe: 'east', type: 'north', sleep: 'east', water: 'east', repair: 'east', cheer: 'east' }, ACT_FRAMES = 9;
   const JOBANIM = { rest: 'sleep', tend: 'water', fix: 'repair' }; // what an astronaut does in their room
+  // Inside the base nobody wears a helmet: PixelLab sprites of a woman (in-w-*) and a man (in-m-*) in the same suit, made by
+  // tools/build_atlas.py into assets/pixellab/astronaut/strips/. Helmets stay on outside and in the airlock.
+  const INDOOR = ['idle', 'walk', 'water', 'repair', 'type', 'cheer', 'back'];
+  const isMan = k => k === 0 ? GENDER === 'man' : GENDER === 'man' ? k === 3 : k >= 2; // the crew is always 2 women and 2 men (setCrew)
+  SPR.in = {};
+  function buildIndoor() { CREW.forEach((c, k) => { const g = isMan(k) ? 'm' : 'w';
+    INDOOR.forEach(n => { (SPR.in[n] = SPR.in[n] || [])[k] = []; for (let i = 0; i < 12; i++) { const im = IMG[`in_${g}_${n}${i}`]; if (im) SPR.in[n][k].push(recolor(im, c.col)); } }); }); }
+  // frames of animation `name` for astronaut k: the helmet-free set indoors (when it exists), else the space-suit set
+  function spr(k, name, indoor) { const f = indoor && SPR.in[name] && SPR.in[name][k]; if (f && f.length) return f;
+    return name === 'idle' ? SPR.idle[k] || [] : name === 'walk' ? SPR.walk[k] || [] : name === 'back' ? (SPR.back[k] ? [SPR.back[k]] : []) : ((SPR.act[name] || [])[k]) || []; }
   // The frame of an action animation for astronaut k, or null. sleep: lie down, then breathe (frames 6-8). cheer: plays once from CHEER[k].
-  function actFrame(k, name, t) { const f = ((SPR.act[name] || [])[k]) || []; if (!f.length) return null;
+  function actFrame(k, name, t, indoor) { const f = spr(k, name, indoor); if (!f.length) return null;
     if (name === 'sleep') return f[Math.min(f.length - 1, 6 + [0, 1, 2, 1][Math.floor(t / 600 + k) % 4])];
     if (name === 'cheer') { const e = t - (CHEER[k] || -1e9); return e >= 0 && e < f.length * 140 ? f[Math.floor(e / 140)] : null; }
     return f[Math.floor(t / 140 + k * 3) % f.length]; }
@@ -143,11 +153,12 @@
     ROOMS.forEach(r => jobs.push(load('room_' + r.img, ART + 'rooms/' + r.img + '.png')));
     Object.keys(MISSIONS).forEach(k => jobs.push(load('patch_' + k, patchSrc(k))));
     // Each animation is one strip of frames side by side (assets/pixellab/astronaut/strips/, made by tools/build_atlas.py)
-    ['walk', 'idle', ...Object.keys(ACTS)].forEach(a => jobs.push(load('strip_' + a, `${ART}astronaut/strips/${a}.png`)));
+    ['walk', 'idle', ...Object.keys(ACTS), ...['w', 'm'].flatMap(g => INDOOR.map(n => `in-${g}-${n}`))].forEach(a => jobs.push(load('strip_' + a, `${ART}astronaut/strips/${a}.png`)));
     await Promise.all(jobs);
     const cut = (a, key) => { const st = IMG['strip_' + a]; if (!st) return; const h = st.height, n = Math.round(st.width / h);
       for (let i = 0; i < n; i++) { const c = document.createElement('canvas'); c.width = c.height = h; c.getContext('2d').drawImage(st, i * h, 0, h, h, 0, 0, h, h); IMG[key(i)] = c; } };
     cut('walk', i => 'walk' + i); cut('idle', i => 'idle' + i); Object.keys(ACTS).forEach(a => cut(a, i => `act_${a}${i}`));
+    ['w', 'm'].forEach(g => INDOOR.forEach(n => cut(`in-${g}-${n}`, i => `in_${g}_${n}${i}`)));
     ROOMS.forEach(r => { if (IMG['room_' + r.img]) IMG['room_' + r.img] = keyOut(IMG['room_' + r.img]); });
     CREW.forEach((c, k) => { SPR.walk[k] = []; SPR.idle[k] = [];
       const look = (key, img) => { const cv = recolor(img, c.col); return k === 0 && COMMANDER.glasses ? addGlasses(cv, key) : cv; };
@@ -156,6 +167,7 @@
       if (IMG.south) SPR.face[k] = look('south', IMG.south);
       if (IMG.north) SPR.back[k] = recolor(IMG.north, c.col);
       Object.keys(ACTS).forEach(a => { (SPR.act[a] = SPR.act[a] || [])[k] = []; for (let i = 0; i < ACT_FRAMES; i++) if (IMG[`act_${a}${i}`]) SPR.act[a][k].push(recolor(IMG[`act_${a}${i}`], c.col)); }); }); // seen from behind (at the lab computer); no glasses needed
+    buildIndoor();
   }
   // Glasses for the commander. Finds each eye on the sprite (a dark pupil with white on one side and skin on the other)
   // and draws a frame and a light lens around it. EYES is the fallback when the browser will not let us read the pixels (file://).
@@ -259,7 +271,7 @@
   const BEDS = [[195, 167, false], [195, 109, false], [78, 214, true], [318, 214, true]];
   function bedSpot(k) { const i = S.jobs.filter((j, kk) => j === 'rest' && kk < k).length; return BEDS[Math.min(i, BEDS.length - 1)]; }
   function drawSleeper(t, k, x, y, s, bag) { // lying on the back, head on the right, under a blanket; breathing and z's
-    const fr = (SPR.idle[k] || [])[0]; if (!fr) return; const br = still ? 0 : Math.sin(t / 700 + k) * 0.8 * s;
+    const fr = spr(k, 'idle', true)[0]; if (!fr) return; const br = still ? 0 : Math.sin(t / 700 + k) * 0.8 * s;
     if (bag) { ctx.fillStyle = '#2f5d8a'; ctx.fillRect(x - 32 * s, y - 9 * s, 56 * s, 18 * s); ctx.fillStyle = '#4a86c2'; ctx.fillRect(x - 32 * s, y - 9 * s, 56 * s, 4 * s); } // sleeping bag
     ctx.save(); ctx.translate(x, y - br); ctx.rotate(Math.PI / 2); ctx.drawImage(fr, -34 * s, -34 * s, 68 * s, 68 * s); ctx.restore();
     ctx.fillStyle = bag ? '#3b74b0' : '#7a5aa8'; ctx.fillRect(x - 30 * s, y - 8 * s - br, 36 * s, 16 * s);            // blanket up to the chest
@@ -302,14 +314,15 @@
       const dx = p.tx - p.x, moving = Math.abs(dx) > 1 && !still;
       if (moving) { p.x += Math.sign(dx) * Math.min(Math.abs(dx), job ? 0.6 : 0.9); p.facing = Math.sign(dx); } else p.x = p.tx;
       const md = MOODS[k], live = md && t >= md.t0 && t - md.t0 < 4200, hop = live && md.hop && !still && t - md.t0 < 1800 ? Math.abs(Math.sin((t - md.t0) / 110)) * 7 : 0;
-      const fr = (moving ? SPR.walk[k] : SPR.idle[k]) || []; if (!fr.length) return;
-      const cheer = !still && actFrame(k, 'cheer', t); // just won a puzzle, or was tapped: a happy jump
+      const indoor = ROOMS[p.room].id !== 'airlock'; // helmet off inside, on in the airlock
+      const fr = spr(k, moving ? 'walk' : 'idle', indoor); if (!fr.length) return;
+      const cheer = !still && actFrame(k, 'cheer', t, indoor); // just won a puzzle, or was tapped: a happy jump
       if (cheer) { drawSprite(cheer, p.x, ry + RH - 9, p.facing, 1); if (k === 0) text('★', p.x, ry + RH - 52, '#ff9a3c', 9); return; }
       if (job === 'rest') { // asleep in a bunk (or a sleeping bag) in the shelter
         const [ax, ay, bag] = bedSpot(k), sx = RW / 384, sy = RH / 240; p.x = rx + ax * sx; drawSleeper(t, k, rx + ax * sx, ry + ay * sy, 0.55, bag);
         if (k === 0) text('★', rx + ax * sx + 16, ry + ay * sy - 8, '#ff9a3c', 8); return; }
       const work = !moving && !still && job ? Math.abs(Math.sin(t / 180 + k)) * 1.5 : 0; // a small busy bob while working
-      const busy = !moving && !still && JOBANIM[job] && actFrame(k, JOBANIM[job], t); // watering, repairing
+      const busy = !moving && !still && JOBANIM[job] && actFrame(k, JOBANIM[job], t, indoor); // watering, repairing
       drawSprite(busy || fr[Math.floor(t / (moving ? 110 : 260)) % fr.length], p.x, ry + RH - 9 - hop - (busy ? 0 : work), p.facing, 1);
       if (!moving && !still) jobFx(t, k, job, p.x + p.facing * 14, ry + RH - 34);
       if (k === 0) text('★', p.x, ry + 16 - hop, '#ff9a3c', 9); if (selected === k) { ctx.fillStyle = '#F0E442'; ctx.fillRect(p.x - 3, ry + 4, 6, 6); }
@@ -317,6 +330,13 @@
         ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; if (window.JAMT_ICON && JAMT_ICON.hasIcon(md.e)) JAMT_ICON.draw(ctx, md.e, p.x, by - 1, 10, () => {}); else ctx.fillText(md.e, p.x, by - 2); ctx.textAlign = 'left'; } });
   }
   // Animations inside a zoomed room (the room art fills x 0–384, y 40–280). Skipped when the player prefers reduced motion.
+  // Colour the zoomed room picture itself (grow-light pink, lights-off dark) instead of a rectangle that spills outside it.
+  let ROOMTINT = null;
+  function roomTint(r, color) { const im = IMG['room_' + r.img]; if (!im) return;
+    if (!ROOMTINT) { ROOMTINT = document.createElement('canvas'); ROOMTINT.width = im.width; ROOMTINT.height = im.height; }
+    const g = ROOMTINT.getContext('2d'); g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, ROOMTINT.width, ROOMTINT.height); g.drawImage(im, 0, 0);
+    g.globalCompositeOperation = 'source-atop'; g.fillStyle = color; g.fillRect(0, 0, ROOMTINT.width, ROOMTINT.height); g.globalCompositeOperation = 'source-over';
+    ctx.drawImage(ROOMTINT, 0, 40, 384, 240); }
   function roomAmbient(t, r, s) {
     const busy = S.jobs.some(j => j && roomFor(j) === r.id), wave = (p, sp) => 0.5 + 0.5 * Math.sin(t / sp + p);
     const rise = (n, x0, w, y0, h, sp, col, size) => { for (let i = 0; i < n; i++) { const ph = ((t / sp) + i / n) % 1, x = x0 + ((i * 37) % w) + Math.sin(t / 400 + i) * 3;
@@ -329,7 +349,7 @@
     if (r.id === 'lab') { const sx = ((t / 1800) % 1) * 360 + 12; ctx.fillStyle = 'rgba(86,180,233,.18)'; ctx.fillRect(sx | 0, 52, 6, 216); // a scanner sweeping the samples
       for (let i = 0; i < 6; i++) { ctx.fillStyle = wave(i * 2.1, 260) > .5 ? ['#3ddc97', '#F0E442', '#56B4E9'][i % 3] : '#1b2233'; ctx.fillRect(30 + i * 10, 60, 6, 4); } // blinking lights
       if (busy) rise(10, 60, 260, 110, 150, 2000, '#F0E442', 3); }                                 // science sparks
-    if (r.id === 'greenhouse') { ctx.fillStyle = `rgba(214,120,255,${0.07 + 0.08 * wave(0, 900)})`; ctx.fillRect(12, 52, 360, 216); // grow-lights
+    if (r.id === 'greenhouse') { roomTint(r, `rgba(214,120,255,${0.07 + 0.08 * wave(0, 900)})`); // grow-lights, on the room only
       for (let i = 0; i < 10; i++) { const ph = ((t / 1500) + i / 10) % 1; ctx.fillStyle = `rgba(120,200,255,${1 - ph})`; ctx.fillRect(40 + (i * 31) % 300, (70 + ph * 150) | 0, 2, 4); } // watering drops
       if (busy) rise(8, 50, 280, 120, 130, 2400, '#7ee08a', 3); }                                  // little leaves
     if (r.id === 'shelter') { if (busy && S.jobs.includes('rest')) for (let i = 0; i < 3; i++) { const ph = ((t / 2200) + i / 3) % 1; ctx.globalAlpha = 1 - ph; text('z', 120 + i * 50 + ph * 20, 190 - ph * 90, '#cfe3ff', 12 + ph * 10); ctx.globalAlpha = 1; } // sleeping
@@ -351,7 +371,7 @@
     if (k < 1) return;
     const C = roomCtx(ri);
     if (!still && isOn(r) !== false) roomAmbient(t, r, s);
-    if (isOn(r) === false) { ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(12, 52, 360, 216); text('LIGHTS OFF', 192, 160, '#aab4ca', 18); }
+    if (isOn(r) === false) { roomTint(r, 'rgba(0,0,0,.6)'); text('LIGHTS OFF', 192, 160, '#aab4ca', 18); }
     if (C.badge) { ctx.fillStyle = 'rgba(0,0,0,.8)'; ctx.fillRect(250, 4, 130, 26); text(C.badge, 315, 22, C.badgeCol, 13); }
     if (r.id === 'battery') { const kk = Math.max(0, s.batt) / s.cap; ctx.fillStyle = '#000'; ctx.fillRect(334, 70, 30, 180);
       ctx.fillStyle = kk < .25 ? '#D55E00' : kk < .5 ? '#E69F00' : '#009E73'; const h = r0(176 * kk); ctx.fillRect(336, 72 + 176 - h, 26, h); text(`${r0(kk * 100)}%`, 349, 268, '#fff', 14); }
@@ -365,10 +385,14 @@
     C.lines.forEach((ln, i) => text(ln, 192, (r.id === 'greenhouse' ? 318 : 306) + i * 18, '#fff', 13));
     const here = S.jobs.map((j, kk) => j && roomFor(j) === r.id ? kk : -1).filter(kk => kk >= 0);
     here.forEach((kk, i) => { if (S.jobs[kk] === 'rest' && !(t - (CHEER[kk] || -1e9) < 1260)) { const [ax, ay, bag] = bedSpot(kk); drawSleeper(t, kk, ax, 40 + ay, 1.5, bag); return; } // in a bunk or sleeping bag
-      const fr = SPR.idle[kk] || [], jt = t - (JUMP[kk] || -9999), cheer = !still && actFrame(kk, 'cheer', t);
+      const indoor = r.id !== 'airlock', fr = spr(kk, 'idle', indoor), jt = t - (JUMP[kk] || -9999), cheer = !still && actFrame(kk, 'cheer', t, indoor);
       const hop = !cheer && jt < 500 && !still ? Math.sin(jt / 500 * Math.PI) * 26 : 0; // tapped: a happy jump (or a little hop)
-      if (!cheer && S.jobs[kk] === 'lab' && SPR.back[kk]) { atComputer(t, kk, hop); return; }
-      const busy = !still && JOBANIM[S.jobs[kk]] && actFrame(kk, JOBANIM[S.jobs[kk]], t);
+      if (!cheer && S.jobs[kk] === 'lab' && spr(kk, 'back', true).length) { atComputer(t, kk, hop); return; }
+      if (!cheer && !still && S.jobs[kk] === 'tend' && indoor) { // walk along the trays, stop at each one and water it
+        const P = 3600, st = [128, 206, 284], n = Math.floor(t / P) + kk, ph = (t % P) / P, a = st[(n + 2) % 3], b = st[n % 3], walk = ph < 0.35, x = walk ? a + (b - a) * (ph / 0.35) : b;
+        const wk = spr(kk, 'walk', true), wt = spr(kk, 'water', true), f = walk ? wk[Math.floor(t / 110) % (wk.length || 1)] : wt[Math.min(wt.length - 1, Math.floor((ph - 0.35) * P / 140) % (wt.length || 1))];
+        if (f) drawSprite(f, x, 274 - hop, walk ? Math.sign(b - a) || 1 : 1, 2); return; }
+      const busy = !still && JOBANIM[S.jobs[kk]] && actFrame(kk, JOBANIM[S.jobs[kk]], t, indoor);
       const f = cheer || busy || (fr.length ? fr[Math.floor(t / 260) % fr.length] : null); if (f) drawSprite(f, 70 + i * 90, 274 - hop, 1, 2); });
   }
   // Lab work: the astronaut stands at the big computer, seen from behind, typing. The screen scrolls data and keys flash.
@@ -380,8 +404,8 @@
       if (Math.floor(t / 450) % 2) { ctx.fillStyle = '#fff'; ctx.fillRect(sx + sw - 10, sy + sh - 8, 4, 5); } // the cursor
       ctx.restore(); }
     const tap = run ? Math.floor(t / 140) % 4 : 0, sway = run ? Math.round(Math.sin(t / 700)) : 0;
-    const typing = (SPR.act.type || [])[kk] || []; // the typing animation (seen from behind), or the still back view
-    if (typing.length) drawSprite(typing[run ? Math.floor(t / 120) % typing.length : 0], PC.x, PC.foot - hop, 1, 2); else drawSprite(SPR.back[kk], PC.x + sway, PC.foot - hop - (tap === 1 ? 1 : 0), 1, 2);
+    const typing = spr(kk, 'type', true); // the typing animation (seen from behind, no helmet), or the still back view
+    if (typing.length) drawSprite(typing[run ? Math.floor(t / 120) % typing.length : 0], PC.x, PC.foot - hop, 1, 2); else drawSprite(spr(kk, 'back', true)[0], PC.x + sway, PC.foot - hop - (tap === 1 ? 1 : 0), 1, 2);
     if (run && tap !== 3) { ctx.fillStyle = '#F0E442'; ctx.fillRect(PC.x + [-14, 10, -2][tap], PC.keysY, 3, 2); } // keys being pressed
   }
   function drawFloats(t) { FLOAT = FLOAT.filter(f => t - f.t0 < 1800); FLOAT.forEach(f => { if (t < f.t0) return; const k = (t - f.t0) / 1800; ctx.globalAlpha = 1 - k * k;
@@ -906,7 +930,7 @@
     const go = () => { const v = $('nm').value.replace(/[^\p{L}\p{N} '-]/gu, '').trim().slice(0, 14); NAME = v || COMMANDER.name || 'Rookie'; TIMERS = $('tm').checked; muted = !$('snd').checked;
       store.set('jamt-name', v === COMMANDER.name ? '' : v); store.set('jamt-welcomed', '1'); store.set('jamt-timers', TIMERS ? 'on' : 'off'); store.set('jamt-mute', muted ? '1' : '0');
       musicOn = $('mus').checked; store.set('jamt-music', musicOn ? 'on' : 'off'); heard = true; music();
-      GENDER = pick; store.set('jamt-gender', GENDER); setCrew(); if (S) hud(); SFX.go(); then(); };
+      GENDER = pick; store.set('jamt-gender', GENDER); setCrew(); buildIndoor(); if (S) hud(); SFX.go(); then(); };
     let pick = GENDER === 'man' ? 'man' : 'woman';
     const showCrew = () => { const g = GENDER; GENDER = pick; setCrew(); $('crewline').textContent = `Your crew: you, ${CREW[1].name}, ${CREW[2].name} and ${CREW[3].name}.`; GENDER = g; setCrew(); };
     $('popcard').querySelectorAll('[data-g]').forEach(b => b.onclick = () => { pick = b.dataset.g; SFX.tap();
