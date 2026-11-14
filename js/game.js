@@ -152,7 +152,7 @@
     g.putImageData(d, 0, 0); return c;
   }
   async function loadArt() {
-    const jobs = [load('bg_moon', ART + 'bg/moon.png'), load('bg_mars', ART + 'bg/mars.png'), load('panels', ART + 'props/solar-panels.png'), load('reactor', ART + 'props/reactor.png'), load('rover', ART + 'props/rover.png'), ...['soil-moon', 'soil-mars', 'tunnel', 'shaft', 'hatch'].map(n => load('base_' + n, ART + 'base/' + n + '.png')), load('south', ART + 'astronaut/Idle/rotations/south.png'), load('north', ART + 'astronaut/Idle/rotations/north.png')];
+    const jobs = [load('bg_moon', ART + 'bg/moon.png'), load('bg_mars', ART + 'bg/mars.png'), ...['moon2', 'moon3', 'mars2'].map(k => load('bg_' + k, ART + 'bg/' + k + '.png')), load('panels', ART + 'props/solar-panels.png'), load('reactor', ART + 'props/reactor.png'), load('rover', ART + 'props/rover.png'), ...['soil-moon', 'soil-mars', 'tunnel', 'shaft', 'hatch'].map(n => load('base_' + n, ART + 'base/' + n + '.png')), load('south', ART + 'astronaut/Idle/rotations/south.png'), load('north', ART + 'astronaut/Idle/rotations/north.png')];
     ROOMS.forEach(r => jobs.push(load('room_' + r.img, ART + 'rooms/' + r.img + '.png'), load('cell_' + r.id, ART + 'cells/' + r.id + '.png'), load('roomm_' + r.img, ART + 'rooms/' + r.img + '-mars.png'), load('roomn_' + r.img, ART + 'rooms/' + r.img + '-moon.png'), load('cellm_' + r.id, ART + 'cells/' + r.id + '-mars.png')));
     Object.keys(MISSIONS).forEach(k => jobs.push(load('patch_' + k, patchSrc(k))));
     // Each animation is one strip of frames side by side (assets/pixellab/astronaut/strips/, made by tools/build_atlas.py)
@@ -206,7 +206,14 @@
   // Free astronauts spread out (shelter, battery room, lab, air maker) instead of all crowding into the shelter.
   const FREE_ROOMS = ['shelter', 'battery', 'lab', 'oxygen'];
   function crewHome() { const n = {}; let free = 0; CREW.forEach((c, k) => { const j = S.jobs[k], want = j ? roomFor(j) : FREE_ROOMS[free++ % FREE_ROOMS.length], ri = Math.max(0, ROOMS.findIndex(r => r.id === want)); n[ri] = (n[ri] || 0) + 1;
-    const p = crewPos[k]; if (p.room !== ri) { p.room = ri; p.x = (ri % 3) * RW + 6; } p.tx = p.home = (ri % 3) * RW + 22 + (n[ri] - 1) * 26; p.next = 0; }); }
+    const p = crewPos[k], hx = (ri % 3) * RW + 22 + (n[ri] - 1) * 26; p.route = p.room === ri || still ? [] : routeTo(p, ri, hx); if (still) p.room = ri;
+    if (!p.route.length) { p.x = p.room === ri ? p.x : hx; } p.tx = p.home = hx; p.next = 0; }); }
+  // Walking between rooms: along the floor and through the doorways, and up or down a ladder between the two floors.
+  const LADDERS = [RW + 22, 2 * RW + 22], BASE_SCALE = 0.85, FLOOR = 4; // ladder x positions (see drawBase); crew size and feet above the cell bottom
+  function routeTo(p, ri, hx) { const r0w = Math.floor(p.room / 3), r1w = Math.floor(ri / 3);
+    if (r0w === r1w) return [{ walk: hx }];
+    const lx = LADDERS.reduce((a, b) => Math.abs(b - (p.x + hx) / 2) < Math.abs(a - (p.x + hx) / 2) ? b : a);
+    return [{ walk: lx }, { climb: r1w }, { walk: hx }]; }
   // ---------- the crew and the world move on their own ----------
   const OUTSIDE = { trip: 'samples', clean: 'panels', regolith: 'soil' }; // jobs done out on the surface
   let PANELS_DARK = null; // the panel picture with a dark tint on its own pixels only (source-atop), redrawn each frame
@@ -238,10 +245,15 @@
     if (job === 'tend') for (let i = 0; i < 3; i++) { const ph = ((t / 700) + i / 3) % 1; ctx.fillStyle = `rgba(120,200,255,${1 - ph})`; ctx.fillRect(x + i * 2, y + 6 + ph * 18, 1, 3); }
     if (job === 'fix' && Math.sin(t / 90 + k) > 0.6) { ctx.fillStyle = '#ffe76a'; ctx.fillRect(x, y + 4, 2, 2); ctx.fillRect(x + 3, y + 1, 1, 1); ctx.fillRect(x - 2, y + 7, 1, 1); }
   }
-  function drawRover(t, moon) { // a small rover (PixelLab picture, assets/pixellab/props/rover.png) crosses the plain now and then
-    const ph = (t / 34000) % 1; if (ph > 0.55) return; const k = ph / 0.55, w = 32, h = 20, x = -40 + k * (CW + 80), y = SKY - 30 + Math.abs(Math.sin(k * 60)) * -0.8;
-    if (!moon) for (let i = 0; i < 5; i++) { const a = (i + (t / 120) % 1) / 5; ctx.fillStyle = `rgba(214,150,96,${0.45 * (1 - a)})`; ctx.fillRect((x - 4 - a * 18) | 0, (y + h - 4 - a * 5) | 0, 3 + a * 4, 2); } // dust behind it on Mars
-    if (IMG.rover) { const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false; ctx.drawImage(IMG.rover, x | 0, y | 0, w, h); ctx.imageSmoothingEnabled = sm; } }
+  // The rover drives in depth: from near the hatch out toward the horizon (smaller and higher up), waits, and comes back
+  // (bigger, facing the other way). Its path stays left of the solar panels.
+  function drawRover(t, moon) {
+    const P = 36000, ph = (t % P) / P, near = [70, SKY - 6, 1.15], far = [165, SKY - 54, 0.38];
+    let k, back = false; if (ph < 0.4) k = ph / 0.4; else if (ph < 0.5) k = 1; else if (ph < 0.9) { k = 1 - (ph - 0.5) / 0.4; back = true; } else return; // parked in the garage for a bit
+    const e = k * k * (3 - 2 * k), x = near[0] + (far[0] - near[0]) * e, yb = near[1] + (far[1] - near[1]) * e, sc = near[2] + (far[2] - near[2]) * e, w = 32 * sc * 1.6, h = 20 * sc * 1.6, y = yb - h + Math.abs(Math.sin(t / 90)) * -0.6 * sc;
+    if (!moon) for (let i = 0; i < 5; i++) { const a = (i + (t / 120) % 1) / 5; ctx.fillStyle = `rgba(214,150,96,${0.45 * (1 - a)})`; ctx.fillRect((x + (back ? w + 4 + a * 14 : -4 - a * 14)) | 0, (yb - 3 - a * 4 * sc) | 0, (3 + a * 4) * sc + 1, 2); } // dust behind it on Mars
+    ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(x + w * 0.1, yb - 1, w * 0.8, Math.max(1, 2 * sc));
+    if (IMG.rover) { const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false; ctx.save(); ctx.translate(x + (back ? w : 0), y); if (back) ctx.scale(-1, 1); ctx.drawImage(IMG.rover, 0, 0, w, h); ctx.restore(); ctx.imageSmoothingEnabled = sm; } }
   const isOn = r => r.sw ? (r.sw === 'lab' ? S.sw.lab && !S.sw.save : S.sw[r.sw]) : null;
   function disc(x, y, r, fill) { ctx.fillStyle = fill; for (let yy = -r; yy <= r; yy++) for (let xx = -r; xx <= r; xx++) if (xx * xx + yy * yy <= r * r + r) ctx.fillRect(x + xx, y + yy, 1, 1); }
   // A plain sun in the sky (no face: it confused players). Tapping it still shows the real Sun from NASA DONKI,
@@ -299,8 +311,8 @@
       if (tun) ctx.drawImage(tun, x - 26, y, 52, 26); else { ctx.fillStyle = '#9aa0ab'; ctx.fillRect(x - 24, y + 8, 48, 10); } }
     [[0, 96], [2, 34]].forEach(([col, dx]) => { const x = col * RW + dx, y = SKY + RH - 22; // ladder shafts between the floors
       if (sh) ctx.drawImage(sh, x - 9, y, 18, 44); else { ctx.fillStyle = '#9aa0ab'; ctx.fillRect(x - 6, y, 12, 44); } });
-    const hx = 30; if (sh) ctx.drawImage(sh, hx - 7, SKY - 6, 14, 22); // from the surface hatch down to the airlock
-    if (IMG.base_hatch) ctx.drawImage(IMG.base_hatch, hx - 18, SKY - 22, 36, 24);
+    const hx = 36; if (sh) ctx.drawImage(sh, hx - 10, SKY - 8, 20, 26); // from the surface hatch down to the airlock
+    if (IMG.base_hatch) ctx.drawImage(IMG.base_hatch, hx - 33, SKY - 42, 66, 44); // the way out: about as big as a solar panel
     ctx.imageSmoothingEnabled = sm; }
   let SMALLTINT = null;
   function smallTint(im, x, y, color) { if (!im) return; if (!SMALLTINT) SMALLTINT = document.createElement('canvas');
@@ -310,7 +322,7 @@
   function drawBase(t) {
     const s = S, moon = s.world === 'moon', L = light(s);
     ctx.fillStyle = moon ? '#000' : '#5a2a17'; ctx.fillRect(0, 0, CW, CH);
-    const bg = IMG[moon ? 'bg_moon' : 'bg_mars']; if (bg) ctx.drawImage(bg, 0, 0, 320, 160, 0, 0, CW, SKY);
+    const bg = IMG['bg_' + S.key] || IMG[moon ? 'bg_moon' : 'bg_mars']; if (bg) ctx.drawImage(bg, 0, 0, 320, 160, 0, 0, CW, SKY); // each mission has its own place
     if (moon) { const ex = 186, ey = 59, R = 13; for (let yy = -R; yy <= R; yy++) for (let xx = -R; xx <= R; xx++) if (xx * xx + yy * yy <= R * R + R) { ctx.fillStyle = xx < 2 ? ((xx * 7 + yy * 3) % 5 === 0 ? '#3fa66b' : '#2f7fd8') : '#0b2440'; ctx.fillRect(ex + xx, ey + yy, 1, 1); } }
     if (moon && L === 0) { ctx.fillStyle = 'rgba(0,0,12,.72)'; ctx.fillRect(0, 0, CW, SKY); }
     const dust = !moon && s.M.dust[s.day] !== undefined ? 1 - s.M.dust[s.day] : 0;
@@ -339,6 +351,15 @@
     CREW.forEach((c, k) => { const p = crewPos[k], [rx, ry] = roomXY(p.room), job = S.jobs[k];
       // jobs done outside: the astronaut walks on the surface (science trip, cleaning panels, digging soil)
       if (!still && OUTSIDE[job]) { drawOutside(t, k, p, job); return; }
+      // on the way to another room: walk to the doorway / ladder, climb, walk on
+      const st0 = p.route && p.route[0];
+      if (st0 && !still) { const row = Math.floor(p.room / 3);
+        if (st0.walk !== undefined) { const d = st0.walk - p.x; p.facing = Math.sign(d) || p.facing; p.x += Math.sign(d) * Math.min(Math.abs(d), 0.9); p.room = row * 3 + Math.max(0, Math.min(2, Math.floor(p.x / RW))); if (Math.abs(d) <= 0.9) p.route.shift(); }
+        else { p.climb = (p.climb || 0) + 1 / 70; if (p.climb >= 1) { p.climb = 0; p.room = st0.climb * 3 + Math.max(0, Math.min(2, Math.floor(p.x / RW))); p.route.shift(); } }
+        const cl = st0.climb !== undefined, fromY = SKY + row * RH, toY = cl ? SKY + st0.climb * RH : fromY, yy = fromY + (toY - fromY) * (cl ? p.climb : 0);
+        const ind = ROOMS[p.room].id !== 'airlock', fr2 = spr(k, cl ? 'walkback' : 'walk', ind); p.tx = p.x;
+        if (fr2.length) drawSprite(fr2[Math.floor(t / (cl ? 160 : 110)) % fr2.length], p.x, yy + RH - FLOOR, cl ? 1 : p.facing, BASE_SCALE);
+        if (k === 0) text('★', p.x, yy + RH - 44, '#ff9a3c', 9); return; }
       // wander a little around their spot, then pause (not while resting)
       if (!still && job !== 'rest' && Math.abs(p.tx - p.x) <= 1 && t > (p.next || 0)) { const home = p.home ?? p.tx, range = job ? 14 : 34;
         p.tx = Math.max(rx + 14, Math.min(rx + RW - 14, home + (Math.random() * 2 - 1) * range)); p.next = t + 1800 + Math.random() * 3500; }
@@ -348,13 +369,13 @@
       const indoor = ROOMS[p.room].id !== 'airlock'; // helmet off inside, on in the airlock
       const fr = spr(k, moving ? 'walk' : 'idle', indoor); if (!fr.length) return;
       const cheer = !still && actFrame(k, 'cheer', t, indoor); // just won a puzzle, or was tapped: a happy jump
-      if (cheer) { drawSprite(cheer, p.x, ry + RH - 9, p.facing, 1); if (k === 0) text('★', p.x, ry + RH - 52, '#ff9a3c', 9); return; }
+      if (cheer) { drawSprite(cheer, p.x, ry + RH - FLOOR, p.facing, BASE_SCALE); if (k === 0) text('★', p.x, ry + RH - 52, '#ff9a3c', 9); return; }
       if (job === 'rest') { // asleep in a bunk (or a sleeping bag) in the shelter
         const cell = !!IMG.cell_shelter, [ax, ay, bag] = bedSpot(k, cell), sx = cell ? 1 : RW / 384, sy = cell ? 1 : RH / 240; p.x = rx + ax * sx; drawSleeper(t, k, rx + ax * sx, ry + ay * sy, cell ? 0.7 : 0.55, bag);
         if (k === 0) text('★', rx + ax * sx + 16, ry + ay * sy - 8, '#ff9a3c', 8); return; }
       const work = !moving && !still && job ? Math.abs(Math.sin(t / 180 + k)) * 1.5 : 0; // a small busy bob while working
       const busy = !moving && !still && JOBANIM[job] && actFrame(k, JOBANIM[job], t, indoor); // watering, repairing
-      drawSprite(busy || fr[Math.floor(t / (moving ? 110 : 260)) % fr.length], p.x, ry + RH - 9 - hop - (busy ? 0 : work), p.facing, 1);
+      drawSprite(busy || fr[Math.floor(t / (moving ? 110 : 260)) % fr.length], p.x, ry + RH - FLOOR - hop - (busy ? 0 : work), p.facing, BASE_SCALE);
       if (!moving && !still) jobFx(t, k, job, p.x + p.facing * 14, ry + RH - 34);
       if (k === 0) text('★', p.x, ry + 16 - hop, '#ff9a3c', 9); if (selected === k) { ctx.fillStyle = '#F0E442'; ctx.fillRect(p.x - 3, ry + 4, 6, 6); }
       if (live) { const by = ry + 2 - hop; ctx.fillStyle = '#fff'; ctx.fillRect(p.x - 9, by - 13, 18, 15); ctx.fillRect(p.x - 2, by + 2, 4, 3); ctx.fillStyle = '#000'; ctx.fillRect(p.x - 9, by - 13, 18, 1);

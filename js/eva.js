@@ -33,7 +33,7 @@
   const FXI = {}, fx = n => { if (!FXI[n]) { FXI[n] = new Image(); FXI[n].src = n.includes('/') ? n : 'assets/pixellab/fx/' + n + '.png'; } return FXI[n]; };
   const ready = im => !!(im && im.complete && im.naturalWidth);
   ['rock-moon-0', 'rock-moon-1', 'rock-moon-2', 'rock-mars-0', 'rock-mars-1', 'rock-mars-2', 'sample', 'hills-moon', 'hills-mars', 'ground-moon', 'ground-mars',
-    'assets/pixellab/props/solar-panels.png', 'assets/pixellab/mg/solar.png', 'assets/pixellab/mg/dust.png', 'assets/pixellab/mg/sandbag.png', 'assets/pixellab/garden/lettuce.png', 'habitat', 'antenna', 'lander', 'corr-wall', 'corr-floor', 'corr-ceil', 'corr-door', 'microscope',
+    'assets/pixellab/props/solar-panels.png', 'assets/pixellab/mg/solar.png', 'assets/pixellab/mg/dust.png', 'assets/pixellab/mg/sandbag.png', 'assets/pixellab/garden/lettuce.png', 'habitat', 'antenna', 'lander', 'mound-moon', 'mound-mars', 'dig-moon', 'dig-mars', 'corr-wall', 'corr-floor', 'corr-ceil', 'corr-door', 'microscope',
     'assets/pixellab/rooms/lab.png', 'assets/pixellab/rooms/oxygen.png', 'assets/pixellab/rooms/greenhouse.png',
     'assets/pixellab/rooms/lab-mars.png', 'assets/pixellab/rooms/oxygen-mars.png', 'assets/pixellab/rooms/greenhouse-mars.png',
     'assets/pixellab/rooms/lab-moon.png', 'assets/pixellab/rooms/oxygen-moon.png', 'assets/pixellab/rooms/greenhouse-moon.png'].forEach(fx);
@@ -113,6 +113,8 @@
         g.fillStyle = rgb([30, 50, 120], 1, fog, E.fogC); g.beginPath(); g.moveTo(sx - w / 2, top + h * 0.2); g.lineTo(sx + w / 2, top + h * 0.2); g.lineTo(sx + w * 0.45, top + h); g.lineTo(sx - w * 0.45, top + h); g.fill();
         g.fillStyle = rgb([90, 130, 220], 1, fog, E.fogC); for (let i = 1; i < 4; i++) g.fillRect(sx - w / 2 + w * i / 4, top + h * 0.2, Math.max(1, u * 0.02), h * 0.8);
         g.fillStyle = `rgba(${E.ground.join(',')},.45)`; g.fillRect(sx - w * 0.45, top + h * 0.55, w * 0.9, h * 0.45); }
+      if (o.k === 'mound' && ready(fx(E.moon ? 'mound-moon' : 'mound-mars'))) { const pi = fx(E.moon ? 'mound-moon' : 'mound-mars'), w = 6 * u, h = w * pi.height / pi.width; // the shelter (PixelLab)
+        g.imageSmoothingEnabled = false; g.globalAlpha = 1 - fog * 0.8; g.drawImage(pi, sx - w / 2, gy - h * 0.95, w, h); g.globalAlpha = 1; return; }
       if (o.k === 'mound') { const w = 5 * u, h = 1.9 * u; // the shelter: a dome of soil with a wall of bags and a door
         g.fillStyle = rgb(E.ground, 0.75, fog, E.fogC); g.beginPath(); g.ellipse(sx, gy, w / 2, h, 0, 3.1416, 6.283); g.fill();
         g.fillStyle = rgb(E.ground, 0.95, fog, E.fogC); g.beginPath(); g.ellipse(sx - w * 0.1, gy - h * 0.15, w * 0.32, h * 0.7, 0, 3.1416, 6.283); g.fill();
@@ -174,15 +176,18 @@
   // the fist. If the pictures are not loaded (yet), armCode draws a simpler arm with code.
   const ARM = { open: new Image(), grip: new Image(), ax: 42, ay: 42, s: 0.72 };
   ARM.open.src = 'assets/pixellab/fp/arm-open.png'; ARM.grip.src = 'assets/pixellab/fp/arm-grip.png';
-  function arm(g, gx, gy, holding, tool) {
+  function arm(g, gx, gy, holding, tool, cap) {
     const grip = !!(holding || tool), im = grip ? ARM.grip : ARM.open; if (!im.complete || !im.naturalWidth) return armCode(g, gx, gy, holding, tool);
-    const s = Math.min(1.0, Math.max(ARM.s, (H + 8 - gy) / (124 - ARM.ay))); // bigger when the hand is high, so the sleeve still reaches the bottom edge
+    const s = Math.min(cap || 1.0, Math.max(ARM.s, (H + 8 - gy) / (124 - ARM.ay))); // bigger when the hand is high, so the sleeve still reaches the bottom edge
     if (tool) tool(gx, gy);                                                    // a tool's handle goes behind the fist
     if (holding) holding(gx - 16 * s, gy - 12 * s);                            // so does what you carry: it sticks out past the fingers (up and left)
     g.save(); g.imageSmoothingEnabled = false; g.translate(gx, gy);
     if (grip) { g.scale(-s, s); g.drawImage(im, -(128 - ARM.ax), -ARM.ay); } else { g.scale(s, s); g.drawImage(im, -ARM.ax, -ARM.ay); }
     g.restore();
   }
+  // A second hand: the left glove (closed), coming in from the bottom left, e.g. lower down a shovel's handle.
+  function leftHand(g, gx, gy, s) { const im = ARM.grip; if (!im.complete || !im.naturalWidth) return;
+    g.save(); g.imageSmoothingEnabled = false; g.translate(gx, gy); g.scale(s, s); g.drawImage(im, -(128 - ARM.ax), -ARM.ay); g.restore(); }
   function armCode(g, gx, gy, holding, tool) {
     const bx = gx + 30, by = H + 18, wx = gx + 2, wy = gy + 8, dx = wx - bx, dy = wy - by, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
     const at = (k, w) => [bx + dx * k + nx * w, by + dy * k + ny * w], poly = pts => { g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.fill(); };
@@ -302,6 +307,19 @@
       draw(g, img, t, X) { const st = X.st;
         if (t < 6500) { const c = walkCam(t, 1600, 6400, st.END, st.path, X.moon, X.still); drawOutside(g, img, st.E, c, [{ x: st.path(12.5) + 0.6, y: 12.5, k: 'mound' }], t); airlockDoor(g, t, X.sound); return c; }
         // close-up: dig soil from the pile with a shovel and drop it on the wall; a new bag pops in and the ruler goes up 1 cm
+        const DG = fx(X.moon ? 'dig-moon' : 'dig-mars'), BAG = fx('assets/pixellab/mg/sandbag.png');
+        if (ready(DG)) { // the PixelLab scene: pile on the left, shelter and bag wall on the right
+          const soilC = X.moon ? [150, 150, 156] : [190, 100, 60], pile = X.moon ? [44, 96] : [58, 92], top = X.moon ? [161, 54] : [168, 78];
+          g.imageSmoothingEnabled = false; g.drawImage(DG, 0, 0, W, H);
+          const k1 = ease(seg(t, 6800, 7600)), k2 = ease(seg(t, 7600, 8500)), sx = pile[0] + 20 + (top[0] - pile[0] - 20) * k2, sy = pile[1] - 20 + k1 * 14 - (pile[1] - top[1]) * k2 - Math.sin(k2 * 3.14) * 18, full = t > 7500 && t < 8550;
+          if (t > 8600 && ready(BAG)) { const pop = 1 + 0.35 * (1 - seg(t, 8600, 8800)); g.drawImage(BAG, top[0] - 9 * pop, top[1] - 7 * pop, 18 * pop, 14 * pop); sparkle(g, top[0] + 8, top[1] - 8, t, 4); }
+          g.fillStyle = '#000'; g.fillRect(182, 30, 6, 72); g.fillStyle = '#F0E442'; g.fillRect(180, 98 - seg(t, 8600, 9000) * 8, 10, 2); // the ruler
+          arm(g, sx + 10, sy - 22, null, (gx, gy) => { g.strokeStyle = '#7a5a3a'; g.lineWidth = 3; g.lineCap = 'round'; g.beginPath(); g.moveTo(gx, gy); g.lineTo(sx - 8, sy + 6); g.stroke(); // the shovel
+            g.fillStyle = '#9aa3b5'; g.beginPath(); g.moveTo(sx - 16, sy + 3); g.lineTo(sx - 3, sy + 4); g.lineTo(sx - 6, sy + 13); g.lineTo(sx - 18, sy + 10); g.fill();
+            if (full) { g.fillStyle = rgb(soilC, 1.1, 0, soilC); g.beginPath(); g.ellipse(sx - 10, sy + 4, 7, 4, 0, 3.1416, 6.283); g.fill(); } }, 0.62);
+          leftHand(g, sx - 1, sy - 6, 0.5); // both hands on the shovel: the left one lower down the handle
+          if (t > 8400 && t < 9200) for (let i = 0; i < 14; i++) { const p = seg(t, 8400 + i * 20, 9000); if (p > 0 && p < 1) { g.fillStyle = rgb(soilC, 1.1, 0, soilC); g.fillRect(top[0] - 8 + (i % 5) * 4, top[1] - 26 + p * 22 + (i % 3) * 3, 2, 2); } } // soil falls on the bag
+          flash(g, t, 6500); helmetOverlay(g, t, X); return null; }
         const soil = X.moon ? [150, 150, 156] : [178, 98, 58]; g.fillStyle = X.moon ? '#05060c' : '#c98a60'; g.fillRect(0, 0, W, 50);
         g.fillStyle = rgb(soil, 0.9, 0, soil); g.fillRect(0, 50, W, H - 50); g.fillStyle = rgb(soil, 1.15, 0, soil); g.beginPath(); g.ellipse(46, 100, 42, 22, 0, 3.1416, 6.283); g.fill(); // the pile
         const bags = t > 8600 ? 10 : 9; for (let b = 0; b < bags; b++) { const r = b < 4 ? 0 : b < 7 ? 1 : b < 9 ? 2 : 3, q = b < 4 ? b : b < 7 ? b - 4 : b < 9 ? b - 7 : 0, pop = b === 9 ? 1 + 0.3 * (1 - seg(t, 8600, 8800)) : 1;
