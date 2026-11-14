@@ -439,12 +439,13 @@
       const record = win && (!best[j] || secs < best[j]); if (record) { best[j] = secs; store.set('jamt-best', JSON.stringify(best)); }
       const streak = win ? (+store.get('jamt-streak') || 0) + 1 : 0; store.set('jamt-streak', String(streak));
       if (win) { S.mg = S.mg || {}; S.mg[j] = true; }
-      // Science trip won: first a 10-second walk outside (js/eva.js), then the result card. Tap or "Skip" to jump ahead.
-      if (win && j === 'trip' && !still && window.JAMT_EVA) {
-        const team = S.jobs.map((jj, k) => jj === 'trip' ? k : -1).filter(k => k >= 0), buddy = team.find(k => k !== 0);
-        popup(`<h2>🚀 Out on the surface…</h2><div id="evahost"></div>`); $('popcard').classList.add('mgcard');
-        JAMT_EVA.play($('evahost'), { world: S.world, partner: SPR.back[buddy != null ? buddy : 1] || null,
-          sound: k => k === 'door' ? beep([[220, .25], [180, .3]], 'sawtooth', .025) : beep([[90, .05]], 'triangle', .05) }, () => show());
+      // Puzzle won: first a 10-second first-person scene of the job (js/eva.js), then the result card. Tap or "Skip" to jump ahead.
+      if (win && !still && window.JAMT_EVA && JAMT_EVA.has(j)) {
+        const team = S.jobs.map((jj, k) => jj === j ? k : -1).filter(k => k >= 0), buddy = team.find(k => k !== 0);
+        const head = { trip: '🚀 Out on the surface…', clean: '🧽 Out to the solar panels…', regolith: '🛡️ Out to the shelter wall…', lab: '🔬 To the lab…', fix: '🔧 To the air maker…', tend: '🌱 To the greenhouse…' }[j];
+        popup(`<h2>${head}</h2><div id="evahost"></div>`); $('popcard').classList.add('mgcard');
+        JAMT_EVA.play($('evahost'), { job: j, world: S.world, partner: j === 'trip' ? SPR.back[buddy != null ? buddy : 1] || null : null,
+          sound: k => k === 'door' ? beep([[220, .25], [180, .3]], 'sawtooth', .025) : k === 'clink' ? beep([[1400, .03], [900, .04]], 'square', .03) : beep([[90, .05]], 'triangle', .05) }, () => show());
         return; }
       show();
       function show() {
