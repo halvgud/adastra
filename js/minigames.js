@@ -16,6 +16,9 @@
     el.innerHTML = `<p class="mgq">Moves: <b id="mgmoves">0</b> · Pairs: <b id="mgpairs">0</b>/${PAIRS.length}</p><div class="memo">${cards.map((p, i) =>
       `<button class="mcard" data-i="${i}" aria-label="Card ${i + 1}, face down"><span class="back">?</span><span class="front">${PAIRS[p][0]}<small>${PAIRS[p][1]}</small></span></button>`).join('')}</div>`;
     const btns = [...el.querySelectorAll('.mcard')];
+    // A quick peek: every card shows its face for a moment at the start, then they all flip over.
+    busy = true; btns.forEach(b => b.classList.add('up'));
+    setTimeout(() => { btns.forEach(b => b.classList.remove('up')); busy = false; }, o.peekMs || 1800);
     btns.forEach((b, i) => b.onclick = () => {
       if (busy || b.classList.contains('up') || b.classList.contains('done')) return;
       b.classList.add('up'); b.setAttribute('aria-label', PAIRS[cards[i]][1]); o.tap(); open.push(i);

@@ -105,7 +105,7 @@
 
   // ---------- art ----------
   const IMG = {}; const load = (k, src) => new Promise(res => { const i = new Image(); i.onload = () => { IMG[k] = i; res(); }; i.onerror = () => res(); i.src = src; });
-  const SPR = { walk: [], idle: [], face: [] };
+  const SPR = { walk: [], idle: [], face: [], back: [] };
   function canvasOf(img) { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').drawImage(img, 0, 0); return c; }
   function keyOut(img) {
     const c = canvasOf(img), g = c.getContext('2d'); let d; try { d = g.getImageData(0, 0, c.width, c.height); } catch (e) { return c; }
@@ -121,7 +121,7 @@
     g.putImageData(d, 0, 0); return c;
   }
   async function loadArt() {
-    const jobs = [load('bg_moon', ART + 'bg/moon.png'), load('bg_mars', ART + 'bg/mars.png'), load('panels', ART + 'props/solar-panels.png'), load('reactor', ART + 'props/reactor.png'), load('south', ART + 'astronaut/Idle/rotations/south.png')];
+    const jobs = [load('bg_moon', ART + 'bg/moon.png'), load('bg_mars', ART + 'bg/mars.png'), load('panels', ART + 'props/solar-panels.png'), load('reactor', ART + 'props/reactor.png'), load('south', ART + 'astronaut/Idle/rotations/south.png'), load('north', ART + 'astronaut/Idle/rotations/north.png')];
     ROOMS.forEach(r => jobs.push(load('room_' + r.img, ART + 'rooms/' + r.img + '.png')));
     Object.keys(MISSIONS).forEach(k => jobs.push(load('patch_' + k, patchSrc(k))));
     for (let i = 0; i < 6; i++) jobs.push(load('walk' + i, `${ART}astronaut/Idle/animations/walk/east/frame_00${i}.png`));
@@ -132,7 +132,8 @@
       const look = (key, img) => { const cv = recolor(img, c.col); return k === 0 && COMMANDER.glasses ? addGlasses(cv, key) : cv; };
       for (let i = 0; i < 6; i++) if (IMG['walk' + i]) SPR.walk[k].push(look('walk' + i, IMG['walk' + i]));
       for (let i = 0; i < 4; i++) if (IMG['idle' + i]) SPR.idle[k].push(look('idle' + i, IMG['idle' + i]));
-      if (IMG.south) SPR.face[k] = look('south', IMG.south); });
+      if (IMG.south) SPR.face[k] = look('south', IMG.south);
+      if (IMG.north) SPR.back[k] = recolor(IMG.north, c.col); }); // seen from behind (at the lab computer); no glasses needed
   }
   // Glasses for the commander. Finds each eye on the sprite (a dark pupil with white on one side and skin on the other)
   // and draws a frame and a light lens around it. EYES is the fallback when the browser will not let us read the pixels (file://).
@@ -317,7 +318,20 @@
     C.lines.forEach((ln, i) => text(ln, 192, (r.id === 'greenhouse' ? 318 : 306) + i * 18, '#fff', 13));
     const here = S.jobs.map((j, kk) => j && roomFor(j) === r.id ? kk : -1).filter(kk => kk >= 0);
     here.forEach((kk, i) => { const fr = SPR.idle[kk] || [], jt = t - (JUMP[kk] || -9999), hop = jt < 500 && !still ? Math.sin(jt / 500 * Math.PI) * 26 : 0; // tapped: a little jump
+      if (S.jobs[kk] === 'lab' && SPR.back[kk]) { atComputer(t, kk, hop); return; }
       if (fr.length) drawSprite(fr[Math.floor(t / 260) % fr.length], 70 + i * 90, 274 - hop, 1, 2); });
+  }
+  // Lab work: the astronaut stands at the big computer, seen from behind, typing. The screen scrolls data and keys flash.
+  const PC = { x: 182, foot: 272, scr: [152, 124, 60, 40], keysY: 196 }; // where the astronaut stands, the main screen (x, y, w, h) and the keyboard row, in the zoomed lab
+  function atComputer(t, kk, hop) {
+    const [sx, sy, sw, sh] = PC.scr, run = !still;
+    if (run) { ctx.save(); ctx.beginPath(); ctx.rect(sx, sy, sw, sh); ctx.clip(); ctx.fillStyle = 'rgba(8,40,70,.55)'; ctx.fillRect(sx, sy, sw, sh);
+      for (let i = 0; i < 9; i++) { const yy = sy + sh - ((t / 40 + i * 6) % (sh + 6)), w = 8 + ((i * 17) % 34); ctx.fillStyle = ['#7fffd4', '#F0E442', '#bfe8ff'][i % 3]; ctx.fillRect(sx + 4, yy | 0, w, 2); } // data scrolling up
+      if (Math.floor(t / 450) % 2) { ctx.fillStyle = '#fff'; ctx.fillRect(sx + sw - 10, sy + sh - 8, 4, 5); } // the cursor
+      ctx.restore(); }
+    const tap = run ? Math.floor(t / 140) % 4 : 0, sway = run ? Math.round(Math.sin(t / 700)) : 0;
+    drawSprite(SPR.back[kk], PC.x + sway, PC.foot - hop - (tap === 1 ? 1 : 0), 1, 2);
+    if (run && tap !== 3) { ctx.fillStyle = '#F0E442'; ctx.fillRect(PC.x + [-14, 10, -2][tap], PC.keysY, 3, 2); } // keys being pressed
   }
   function drawFloats(t) { FLOAT = FLOAT.filter(f => t - f.t0 < 1800); FLOAT.forEach(f => { if (t < f.t0) return; const k = (t - f.t0) / 1800; ctx.globalAlpha = 1 - k * k;
     ctx.font = 'bold 15px ui-monospace, Consolas, monospace'; const half = ctx.measureText(f.txt).width / 2 + 4, x = Math.min(CW - half, Math.max(half, f.x)); // keep it on screen
