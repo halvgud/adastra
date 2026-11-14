@@ -13,17 +13,27 @@
   const MC = T.missionControl || {}; let MCNAME = '';
   const mcLabel = () => MCNAME ? `${esc(MCNAME)} · Mission Control` : 'Mission Control';
   $('coachimg').alt = 'Mission Control';
+  // Two private modes, both opened with the owner's passphrase (a wrong one changes nothing), remembered on that device:
+  //   ?mc=<passphrase>     her name shows, and the "AI" marks are hidden
+  //   ?clean=<passphrase>  no name, and the "AI" marks are hidden
+  //   ?mc=off or ?clean=off  back to normal (anonymous, with the AI marks)
+  // The public game always shows the AI marks (Space Apps rule): use these modes only for private viewing, never for the demo.
+  let NOAI = false;
   async function unlockName() {
-    const q = new URLSearchParams(location.search); let pass = q.get('mc');
-    if (pass === 'off') { store.set('jamt-mc', ''); pass = null; } else if (pass) store.set('jamt-mc', pass); else pass = store.get('jamt-mc');
-    if (q.has('mc')) { q.delete('mc'); const s = q.toString(); try { history.replaceState(null, '', location.pathname + (s ? '?' + s : '') + location.hash); } catch (e) {} } // keep the key out of the address bar
+    const q = new URLSearchParams(location.search); let pass = q.get('mc'), mode = 'name';
+    if (q.get('clean')) { pass = q.get('clean'); mode = 'clean'; }
+    if (pass === 'off') { store.set('jamt-mc', ''); store.set('jamt-mcmode', ''); pass = null; }
+    else if (pass) { store.set('jamt-mc', pass); store.set('jamt-mcmode', mode); }
+    else { pass = store.get('jamt-mc'); mode = store.get('jamt-mcmode') || 'name'; }
+    if (q.has('mc') || q.has('clean')) { q.delete('mc'); q.delete('clean'); const s = q.toString(); try { history.replaceState(null, '', location.pathname + (s ? '?' + s : '') + location.hash); } catch (e) {} } // keep the key out of the address bar
     const X = MC.secretName; if (!pass || !X || !(window.crypto && crypto.subtle)) return;
     try { const b = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
       const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
       const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b(X.salt), iterations: X.iter, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
-      MCNAME = new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b(X.iv) }, key, b(X.data)));
-      $('coachimg').alt = MCNAME + ', Mission Control';
-    } catch (e) { MCNAME = ''; } } // a wrong key just leaves her anonymous
+      const name = new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b(X.iv) }, key, b(X.data))); // throws if the passphrase is wrong
+      NOAI = true; document.documentElement.classList.add('noai');
+      if (mode === 'name') { MCNAME = name; $('coachimg').alt = MCNAME + ', Mission Control'; }
+    } catch (e) { MCNAME = ''; } } // a wrong key just leaves her anonymous, with the AI marks
   // Glasses on the 64 × 64 portrait: [left, top, width, height] of each lens, found by reading the portrait's pixels.
   const GLASSES_MC = [[18, 21, 8, 5], [30, 21, 8, 5]];
   function dressMissionControl() { if (!MC.glasses) return; const im = new Image();
@@ -344,6 +354,7 @@
     ctx.globalAlpha = k < .1 ? k * 10 : k > .85 ? (1 - k) / .15 : 1; ctx.fillStyle = 'rgba(0,0,0,.78)'; ctx.fillRect(72, 18, 240, 64); ctx.fillStyle = '#F0E442'; ctx.fillRect(72, 18, 240, 3); ctx.fillRect(72, 79, 240, 3);
     text(BANNER.title, 192, 42, '#F0E442', 17); text(BANNER.line, 192, 68, '#fff', 13); ctx.globalAlpha = 1; }
   function aiMark() { // visible watermark on the scene itself, so screenshots and videos carry it (Space Apps rule for AI images)
+    if (NOAI) return; // private mode only (see unlockName)
     ctx.font = 'bold 8px ui-monospace, Consolas, monospace'; const t = 'AI', w = ctx.measureText(t).width + 8;
     ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(CW - w - 2, CH - 15, w, 13); ctx.fillStyle = '#fff'; ctx.fillText(t, CW - w + 2, CH - 5); }
   function loop(t) { if (S) { if (view.mode === 'room') drawRoom(t, view.room, still ? 1 : Math.min(1, (t - view.t0) / 280)); else { drawBase(t); drawBanner(t); } drawPokes(t); drawFloats(t); drawFX(t); aiMark(); } requestAnimationFrame(loop); }
@@ -763,7 +774,7 @@
     say(SITE ? `Play my mission at ${SITE.replace(/^https?:\/\//, '').replace(/\/$/, '')} · “${m.title}” · code #${run.code}` : `Play my mission: “${m.title}” · code #${run.code}`, 540, 990, 34, '#F0E442', 800);
     say('Made with real NASA data: ' + CARD_SOURCES, 540, 1030, 26, '#f4f6fb', 700);
     say('Not an official NASA product', 540, 1064, 20, '#aab4ca', 600);
-    g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(1020, 90, 50, 28); say('AI', 1045, 110, 18, '#ffffff', 800); // visible AI watermark (Space Apps rule)
+    if (!NOAI) { g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(1020, 90, 50, 28); say('AI', 1045, 110, 18, '#ffffff', 800); } // visible AI watermark (Space Apps rule; hidden only in private mode)
     return c;
   }
   function shareText(run) { const m = MISSIONS[run.key], url = SITE ? ` ${SITE}#${run.key}-${run.code}` : /^https?:$/.test(location.protocol) ? ` ${location.origin}${location.pathname}#${run.key}-${run.code}` : '';
