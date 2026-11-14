@@ -226,7 +226,9 @@
   // Frames are 68 px (idle, walk) or 76 px (the action animations: the same astronaut with room to move); feet sit 8 px
   // above the bottom of a 68 px frame, and the bigger canvas adds the same margin on every side.
   function drawSprite(fr, x, footY, facing, scale) { const s = scale || 1, w = fr.width || 68, pad = (w - 68) / 2; ctx.save(); ctx.translate(x, footY - (60 + pad) * s); if (facing < 0) ctx.scale(-1, 1); ctx.drawImage(fr, -(w / 2) * s, 0, w * s, w * s); ctx.restore(); }
-  function text(t, x, y, color, size) { ctx.font = `bold ${size || 12}px ui-monospace, Consolas, monospace`; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.strokeText(t, x, y); ctx.fillStyle = color; ctx.fillText(t, x, y); ctx.textAlign = 'left'; }
+  function text(t, x, y, color, size) { ctx.font = `bold ${size || 12}px ui-monospace, Consolas, monospace`; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.fillStyle = color;
+    if (window.JAMT_ICON && JAMT_ICON.hasIcon(t)) JAMT_ICON.draw(ctx, t, x, y, size || 12, (p, px) => { ctx.strokeText(p, px, y); ctx.fillText(p, px, y); }); // emoji become pixel icons (js/icons.js)
+    else { ctx.strokeText(t, x, y); ctx.fillText(t, x, y); } ctx.textAlign = 'left'; }
 
   // Small background animations, so the base feels alive. All skipped when the player prefers reduced motion.
   const STARS = Array.from({ length: 16 }, (_, i) => [(i * 97 + 31) % CW, 6 + (i * 53) % 120, (i * 0.7) % 6.28]);
@@ -288,7 +290,7 @@
       if (!moving && !still) jobFx(t, k, job, p.x + p.facing * 14, ry + RH - 34);
       if (k === 0) text('★', p.x, ry + 16 - hop, '#ff9a3c', 9); if (selected === k) { ctx.fillStyle = '#F0E442'; ctx.fillRect(p.x - 3, ry + 4, 6, 6); }
       if (live) { const by = ry + 2 - hop; ctx.fillStyle = '#fff'; ctx.fillRect(p.x - 9, by - 13, 18, 15); ctx.fillRect(p.x - 2, by + 2, 4, 3); ctx.fillStyle = '#000'; ctx.fillRect(p.x - 9, by - 13, 18, 1);
-        ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(md.e, p.x, by - 2); ctx.textAlign = 'left'; } });
+        ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; if (window.JAMT_ICON && JAMT_ICON.hasIcon(md.e)) JAMT_ICON.draw(ctx, md.e, p.x, by - 1, 10, () => {}); else ctx.fillText(md.e, p.x, by - 2); ctx.textAlign = 'left'; } });
   }
   // Animations inside a zoomed room (the room art fills x 0–384, y 40–280). Skipped when the player prefers reduced motion.
   function roomAmbient(t, r, s) {
@@ -775,7 +777,8 @@
     const m = MISSIONS[run.key], moon = m.world === 'moon', c = document.createElement('canvas'); c.width = c.height = 1080;
     const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
     const say = (t, x, y, size, col, weight = 800, font = MONO, outline = 0) => { let s = size; do { g.font = `${weight} ${s}px ${font}`; s -= 2; } while (g.measureText(t).width > 1000 && s > 16);
-      if (outline) { g.lineJoin = 'round'; g.lineWidth = outline; g.strokeStyle = '#000'; g.strokeText(t, x, y); } g.fillStyle = col; g.fillText(t, x, y); };
+      const paint = (p, px) => { if (outline) { g.lineJoin = 'round'; g.lineWidth = outline; g.strokeStyle = '#000'; g.strokeText(p, px, y); } g.fillStyle = col; g.fillText(p, px, y); };
+      if (window.JAMT_ICON && JAMT_ICON.hasIcon(t)) JAMT_ICON.draw(g, t, x, y, s + 2, paint); else paint(t, x); };
     g.fillStyle = '#0b1020'; g.fillRect(0, 0, 1080, 1080);
     if (IMG['bg_' + m.world]) g.drawImage(IMG['bg_' + m.world], -100, 0, 1280, 640);
     const fade = g.createLinearGradient(0, 360, 0, 640); fade.addColorStop(0, 'rgba(11,16,32,0)'); fade.addColorStop(1, '#0b1020'); g.fillStyle = fade; g.fillRect(0, 360, 1080, 281);

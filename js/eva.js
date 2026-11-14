@@ -130,9 +130,10 @@
     const grip = !!(holding || tool), im = grip ? ARM.grip : ARM.open; if (!im.complete || !im.naturalWidth) return armCode(g, gx, gy, holding, tool);
     const s = Math.min(1.0, Math.max(ARM.s, (H + 8 - gy) / (124 - ARM.ay))); // bigger when the hand is high, so the sleeve still reaches the bottom edge
     if (tool) tool(gx, gy);                                                    // a tool's handle goes behind the fist
+    if (holding) holding(gx - 16 * s, gy - 12 * s);                            // so does what you carry: it sticks out past the fingers (up and left)
     g.save(); g.imageSmoothingEnabled = false; g.translate(gx, gy);
     if (grip) { g.scale(-s, s); g.drawImage(im, -(128 - ARM.ax), -ARM.ay); } else { g.scale(s, s); g.drawImage(im, -ARM.ax, -ARM.ay); }
-    g.restore(); if (holding) holding(gx - 2, gy + 16 * s); // what you carry hangs just under the fist, in front of it
+    g.restore();
   }
   function armCode(g, gx, gy, holding, tool) {
     const bx = gx + 30, by = H + 18, wx = gx + 2, wy = gy + 8, dx = wx - bx, dy = wy - by, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
