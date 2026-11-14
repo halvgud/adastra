@@ -77,6 +77,8 @@
   const words = el => el.innerText || el.textContent; // innerText keeps the pauses between paragraphs
   const bindRead = root => root.querySelectorAll('.read').forEach(b => b.onclick = () => speak(words(b.closest('.mc').querySelector('.bubble'))));
   $('coachread').onclick = () => speak(words($('coachtxt')));
+  // While the Mission Control box is open, the page gets that much extra room at the bottom, so you can scroll past it.
+  if (window.ResizeObserver) new ResizeObserver(() => { const h = $('coach').offsetHeight; document.documentElement.style.setProperty('--coachH', h ? (h + 12) + 'px' : '0px'); }).observe($('coach'));
 
   // ---------- words kids can tap ----------
   const WORDS = T.words; // data/text.js

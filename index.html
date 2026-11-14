@@ -17,7 +17,7 @@
   button { font: inherit; color: inherit; cursor: pointer; }
   button:focus-visible, input:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
   button[disabled] { opacity: .45; cursor: not-allowed; }
-  .app { max-width: 720px; margin: 0 auto; padding: 8px 10px 96px; }
+  .app { max-width: 720px; margin: 0 auto; padding: 8px 10px calc(96px + var(--coachH, 0px)); }  /* --coachH: room for the Mission Control box (js/game.js), so it never covers the last buttons */
 
   .top { display: flex; align-items: center; gap: 5px; margin-bottom: 6px; }
   .top .day { font-weight: 800; white-space: nowrap; }
