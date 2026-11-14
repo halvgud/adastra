@@ -115,7 +115,9 @@
 
   // ---------- art ----------
   const IMG = {}; const load = (k, src) => new Promise(res => { const i = new Image(); i.onload = () => { IMG[k] = i; res(); }; i.onerror = () => res(); i.src = src; });
-  const SPR = { walk: [], idle: [], face: [], back: [] };
+  const SPR = { walk: [], idle: [], face: [], back: [], act: {} };
+  // Action animations made with PixelLab (assets/pixellab/astronaut/Idle/animations/<name>/<direction>/frame_00N.png)
+  const ACTS = { pick: 'east', dig: 'east', wipe: 'east', type: 'north' }, ACT_FRAMES = 9;
   function canvasOf(img) { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').drawImage(img, 0, 0); return c; }
   function keyOut(img) {
     const c = canvasOf(img), g = c.getContext('2d'); let d; try { d = g.getImageData(0, 0, c.width, c.height); } catch (e) { return c; }
@@ -136,6 +138,7 @@
     Object.keys(MISSIONS).forEach(k => jobs.push(load('patch_' + k, patchSrc(k))));
     for (let i = 0; i < 6; i++) jobs.push(load('walk' + i, `${ART}astronaut/Idle/animations/walk/east/frame_00${i}.png`));
     for (let i = 0; i < 4; i++) jobs.push(load('idle' + i, `${ART}astronaut/Idle/animations/idle/east/frame_00${i}.png`));
+    Object.entries(ACTS).forEach(([a, d]) => { for (let i = 0; i < ACT_FRAMES; i++) jobs.push(load(`act_${a}${i}`, `${ART}astronaut/Idle/animations/${a}/${d}/frame_00${i}.png`)); });
     await Promise.all(jobs);
     ROOMS.forEach(r => { if (IMG['room_' + r.img]) IMG['room_' + r.img] = keyOut(IMG['room_' + r.img]); });
     CREW.forEach((c, k) => { SPR.walk[k] = []; SPR.idle[k] = [];
@@ -143,7 +146,8 @@
       for (let i = 0; i < 6; i++) if (IMG['walk' + i]) SPR.walk[k].push(look('walk' + i, IMG['walk' + i]));
       for (let i = 0; i < 4; i++) if (IMG['idle' + i]) SPR.idle[k].push(look('idle' + i, IMG['idle' + i]));
       if (IMG.south) SPR.face[k] = look('south', IMG.south);
-      if (IMG.north) SPR.back[k] = recolor(IMG.north, c.col); }); // seen from behind (at the lab computer); no glasses needed
+      if (IMG.north) SPR.back[k] = recolor(IMG.north, c.col);
+      Object.keys(ACTS).forEach(a => { (SPR.act[a] = SPR.act[a] || [])[k] = []; for (let i = 0; i < ACT_FRAMES; i++) if (IMG[`act_${a}${i}`]) SPR.act[a][k].push(recolor(IMG[`act_${a}${i}`], c.col)); }); }); // seen from behind (at the lab computer); no glasses needed
   }
   // Glasses for the commander. Finds each eye on the sprite (a dark pupil with white on one side and skin on the other)
   // and draws a frame and a light lens around it. EYES is the fallback when the browser will not let us read the pixels (file://).
@@ -189,11 +193,12 @@
     if (p.ox === undefined || p.ojob !== job) { p.ox = zone[0] + 10 + k * 14; p.otx = p.ox; p.ojob = job; p.onext = 0; }
     if (Math.abs(p.otx - p.ox) < 1 && t > p.onext) { p.otx = zone[0] + Math.random() * (zone[1] - zone[0]); p.onext = t + 1600 + Math.random() * 2600; }
     const dx = p.otx - p.ox, moving = Math.abs(dx) > 1; if (moving) { p.ox += Math.sign(dx) * 0.55; p.ofacing = Math.sign(dx); }
-    const fr = (moving ? SPR.walk[k] : SPR.idle[k]) || []; if (!fr.length) return;
-    const crouch = !moving ? Math.max(0, Math.sin(t / 260 + k)) * 4 : 0; // bending down to pick up a sample, wipe, or dig
-    drawSprite(fr[Math.floor(t / (moving ? 120 : 260)) % fr.length], p.ox, foot + crouch, p.ofacing || 1, 0.7);
+    const act = ((SPR.act[{ trip: 'pick', clean: 'wipe', regolith: 'dig' }[job]] || [])[k]) || [], useAct = !moving && act.length; // picking up a sample, wiping, digging
+    const fr = (moving ? SPR.walk[k] : useAct ? act : SPR.idle[k]) || []; if (!fr.length) return;
+    const fi = Math.floor(t / (moving ? 120 : useAct ? 140 : 260) + k * 3) % fr.length, crouch = useAct ? 0 : !moving ? Math.max(0, Math.sin(t / 260 + k)) * 4 : 0;
+    drawSprite(fr[fi], p.ox, foot + crouch, p.ofacing || 1, 0.7);
     if (k === 0) text('★', p.ox, foot - 44 + crouch, '#ff9a3c', 8);
-    if (!moving && crouch > 3) { const hx = p.ox + (p.ofacing || 1) * 10; // what their hands do
+    if (!moving && (useAct ? fi >= 3 && fi <= 6 : crouch > 3)) { const hx = p.ox + (p.ofacing || 1) * 10; // what their hands do
       if (job === 'trip') { ctx.fillStyle = '#F0E442'; ctx.fillRect(hx, foot - 4, 2, 2); ctx.fillRect(hx - 2, foot - 2, 1, 1); ctx.fillRect(hx + 3, foot - 3, 1, 1); }
       if (job === 'clean') { ctx.fillStyle = 'rgba(214,150,96,.8)'; for (let i = 0; i < 3; i++) ctx.fillRect(hx + i * 3, foot - 26 - (t / 40 + i * 5) % 10, 2, 2); }
       if (job === 'regolith') { ctx.fillStyle = S.world === 'moon' ? '#b9b2a6' : '#c27a4c'; for (let i = 0; i < 4; i++) ctx.fillRect(hx + i * 2, foot - 2 - ((t / 30 + i * 4) % 12), 2, 2); } }
@@ -218,7 +223,9 @@
     else if (sunWord === 'ACTIVE') ctx.fillRect(x - 3, y + 4, 7, 1);
     else { ctx.fillRect(x - 5, y - 5, 3, 1); ctx.fillRect(x + 3, y - 5, 3, 1); ctx.fillRect(x - 3, y + 4, 7, 1); ctx.fillRect(x - 3, y + 3, 1, 1); ctx.fillRect(x + 3, y + 3, 1, 1); }
   }
-  function drawSprite(fr, x, footY, facing, scale) { const s = scale || 1; ctx.save(); ctx.translate(x, footY - 60 * s); if (facing < 0) ctx.scale(-1, 1); ctx.drawImage(fr, -34 * s, 0, 68 * s, 68 * s); ctx.restore(); }
+  // Frames are 68 px (idle, walk) or 76 px (the action animations: the same astronaut with room to move); feet sit 8 px
+  // above the bottom of a 68 px frame, and the bigger canvas adds the same margin on every side.
+  function drawSprite(fr, x, footY, facing, scale) { const s = scale || 1, w = fr.width || 68, pad = (w - 68) / 2; ctx.save(); ctx.translate(x, footY - (60 + pad) * s); if (facing < 0) ctx.scale(-1, 1); ctx.drawImage(fr, -(w / 2) * s, 0, w * s, w * s); ctx.restore(); }
   function text(t, x, y, color, size) { ctx.font = `bold ${size || 12}px ui-monospace, Consolas, monospace`; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.strokeText(t, x, y); ctx.fillStyle = color; ctx.fillText(t, x, y); ctx.textAlign = 'left'; }
 
   // Small background animations, so the base feels alive. All skipped when the player prefers reduced motion.
@@ -344,7 +351,8 @@
       if (Math.floor(t / 450) % 2) { ctx.fillStyle = '#fff'; ctx.fillRect(sx + sw - 10, sy + sh - 8, 4, 5); } // the cursor
       ctx.restore(); }
     const tap = run ? Math.floor(t / 140) % 4 : 0, sway = run ? Math.round(Math.sin(t / 700)) : 0;
-    drawSprite(SPR.back[kk], PC.x + sway, PC.foot - hop - (tap === 1 ? 1 : 0), 1, 2);
+    const typing = (SPR.act.type || [])[kk] || []; // the typing animation (seen from behind), or the still back view
+    if (typing.length) drawSprite(typing[run ? Math.floor(t / 120) % typing.length : 0], PC.x, PC.foot - hop, 1, 2); else drawSprite(SPR.back[kk], PC.x + sway, PC.foot - hop - (tap === 1 ? 1 : 0), 1, 2);
     if (run && tap !== 3) { ctx.fillStyle = '#F0E442'; ctx.fillRect(PC.x + [-14, 10, -2][tap], PC.keysY, 3, 2); } // keys being pressed
   }
   function drawFloats(t) { FLOAT = FLOAT.filter(f => t - f.t0 < 1800); FLOAT.forEach(f => { if (t < f.t0) return; const k = (t - f.t0) / 1800; ctx.globalAlpha = 1 - k * k;
@@ -448,7 +456,7 @@
         const team = S.jobs.map((jj, k) => jj === j ? k : -1).filter(k => k >= 0), buddy = team.find(k => k !== 0);
         const head = { trip: '🚀 Out on the surface…', clean: '🧽 Out to the solar panels…', regolith: '🛡️ Out to the shelter wall…', lab: '🔬 To the lab…', fix: '🔧 To the air maker…', tend: '🌱 To the greenhouse…' }[j];
         popup(`<h2>${head}</h2><div id="evahost"></div>`); $('popcard').classList.add('mgcard');
-        JAMT_EVA.play($('evahost'), { job: j, world: S.world, banner: j === 'fix' && !S.broken ? `ALL CHECKED! +${MGR.stars} ★` : null, partner: j === 'trip' ? SPR.back[buddy != null ? buddy : 1] || null : null,
+        JAMT_EVA.play($('evahost'), { job: j, world: S.world, noai: NOAI, banner: j === 'fix' && !S.broken ? `ALL CHECKED! +${MGR.stars} ★` : null, partner: j === 'trip' ? SPR.back[buddy != null ? buddy : 1] || null : null,
           sound: k => k === 'door' ? beep([[220, .25], [180, .3]], 'sawtooth', .025) : k === 'clink' ? beep([[1400, .03], [900, .04]], 'square', .03) : k === 'pop' ? beep([[300, .04], [600, .06]], 'triangle', .05) : beep([[90, .05]], 'triangle', .05) }, () => show());
         return; }
       show();

@@ -121,7 +121,20 @@
   // The forearm comes in from the bottom of the screen and gets narrower toward the wrist, with suit folds and an orange
   // cuff. The glove points along the arm (palm, thumb, four fingers); holding(x, y) draws what the hand carries, and the
   // fingers then close over it. (gx, gy) is about where the glove is.
+  // Your arm, drawn with two PixelLab pictures (assets/pixellab/fp/): an open glove, and a closed one (flipped so both
+  // come in from the bottom right). (gx, gy) = the middle of the glove; holding(x, y) draws what the hand carries, behind
+  // the fist. If the pictures are not loaded (yet), armCode draws a simpler arm with code.
+  const ARM = { open: new Image(), grip: new Image(), ax: 42, ay: 42, s: 0.72 };
+  ARM.open.src = 'assets/pixellab/fp/arm-open.png'; ARM.grip.src = 'assets/pixellab/fp/arm-grip.png';
   function arm(g, gx, gy, holding, tool) {
+    const grip = !!(holding || tool), im = grip ? ARM.grip : ARM.open; if (!im.complete || !im.naturalWidth) return armCode(g, gx, gy, holding, tool);
+    const s = Math.min(1.0, Math.max(ARM.s, (H + 8 - gy) / (124 - ARM.ay))); // bigger when the hand is high, so the sleeve still reaches the bottom edge
+    if (tool) tool(gx, gy);                                                    // a tool's handle goes behind the fist
+    g.save(); g.imageSmoothingEnabled = false; g.translate(gx, gy);
+    if (grip) { g.scale(-s, s); g.drawImage(im, -(128 - ARM.ax), -ARM.ay); } else { g.scale(s, s); g.drawImage(im, -ARM.ax, -ARM.ay); }
+    g.restore(); if (holding) holding(gx - 2, gy + 16 * s); // what you carry hangs just under the fist, in front of it
+  }
+  function armCode(g, gx, gy, holding, tool) {
     const bx = gx + 30, by = H + 18, wx = gx + 2, wy = gy + 8, dx = wx - bx, dy = wy - by, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
     const at = (k, w) => [bx + dx * k + nx * w, by + dy * k + ny * w], poly = pts => { g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.fill(); };
     const half = k => 17 - 9 * k; // half the sleeve's width, from the screen edge (k = 0) to the wrist (k = 1)
@@ -272,7 +285,7 @@
         g.save(); g.translate(cx, cy); g.rotate(ang); g.fillStyle = '#d2d6de'; g.beginPath(); for (let k = 0; k < 6; k++) g.lineTo(Math.cos(k * 1.047) * 13, Math.sin(k * 1.047) * 13); g.fill(); g.fillStyle = '#9aa3b5'; g.beginPath(); g.arc(0, 0, 5, 0, 6.283); g.fill(); g.restore(); // the nut
         const wa = ang + 0.9, hx = cx + Math.cos(wa) * 60, hy = cy + Math.sin(wa) * 60; // the wrench, held by your glove
         g.strokeStyle = '#8c95a8'; g.lineWidth = 8; g.lineCap = 'round'; g.beginPath(); g.moveTo(cx + Math.cos(wa) * 16, cy + Math.sin(wa) * 16); g.lineTo(hx, hy); g.stroke(); g.fillStyle = '#8c95a8'; g.beginPath(); g.arc(cx + Math.cos(wa) * 15, cy + Math.sin(wa) * 15, 9, 0, 6.283); g.fill();
-        if (t > 5600) arm(g, hx, hy - 4, null);
+        if (t > 5600) arm(g, hx, hy - 4, null, () => {}); // a closed glove on the wrench
         const ok = seg(t, 7900, 8600); g.fillStyle = '#111'; g.beginPath(); g.arc(166, 22, 15, 0, 6.283); g.fill(); g.fillStyle = '#d55e00'; g.beginPath(); g.moveTo(166, 22); g.arc(166, 22, 13, 3.14, 4.4); g.fill(); g.fillStyle = '#009E73'; g.beginPath(); g.moveTo(166, 22); g.arc(166, 22, 13, 5.0, 6.28); g.fill();
         const na = 3.4 + ok * 2.6 + (leak ? Math.sin(t / 80) * 0.1 : 0); g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.moveTo(166, 22); g.lineTo(166 + Math.cos(na) * 12, 22 + Math.sin(na) * 12); g.stroke(); } },
 
@@ -345,6 +358,7 @@
       else { S.close(g, t, X); flash(g, t, 5300); helmetOverlay(g, t, X); }
       banner(g, t, { banner: opt.banner || S.banner, at: S.at });
       if (c && c.walking) { const step = Math.floor(t / (S.outside && moon ? 840 : 380)); if (step !== lastStep) { lastStep = step; X.sound('step'); } }
+      if (!opt.noai) { g.font = 'bold 6px ui-monospace, Consolas, monospace'; g.textAlign = 'left'; g.fillStyle = 'rgba(0,0,0,.7)'; g.fillRect(W - 15, 2, 13, 9); g.fillStyle = '#fff'; g.fillText('AI', W - 12, 9); } // the arms and astronaut are PixelLab pictures (Space Apps rule: a visible AI mark)
       if (t > DUR - 500) { g.fillStyle = `rgba(0,0,0,${(t - DUR + 500) / 500})`; g.fillRect(0, 0, W, H); }
       if (still || fixed) return;
       raf = requestAnimationFrame(frame);

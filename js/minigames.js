@@ -145,17 +145,19 @@
   //   (Mold, not bugs: a sealed space greenhouse has no insects, but damp leaves and still air do grow mold.)
   //   Tapping a plant that is not ready, with no mold and no thirst, is a mistake too. 5 mistakes allowed. Fill the basket to win.
   // Mold comes more often as the basket fills. Plants keep ripening the whole time, so it can always be won.
+  const GARDEN = 'assets/pixellab/garden/';
   function tend(el, o) {
     const R = o.rng, N = 12, GOAL = 12, WILT = 6500, MAXRIPE = 3, PERFECT = 1100, MAXMISS = 5, GROW = () => 1 / (11000 + R() * 7000);
     const P = Array.from({ length: N }, () => ({ g: R() * 0.45, speed: GROW(), water: 0.45 + R() * 0.55, bug: 0, ripe: 0, wilt: 0, pop: 0 }));
     let score = 0, over = false, last = performance.now(), nextBug = last + 3500;
     el.innerHTML = `<div class="basket"><span>🧺</span><div class="bbar"><i id="mgbar"></i></div><b id="mgpick">0</b>/${GOAL}</div>
-      <div class="tiles garden" style="--cols:4">${P.map((_, i) => `<button class="tile pot" data-i="${i}"><span class="pl"></span><i class="b thirst">💧</i><i class="b bug">🦠</i><i class="b spark">✨</i><i class="b fly"></i></button>`).join('')}</div>`;
+      <div class="gardenwrap"><div class="tiles garden" style="--cols:4">${P.map((_, i) => `<button class="tile pot" data-i="${i}"><span class="pl"></span><i class="b thirst"><img src="${GARDEN}drop.png" alt=""></i><i class="b bug"><img src="${GARDEN}mold.png" alt=""></i><i class="b spark">✨</i><i class="b fly"></i></button>`).join('')}</div><i class="aitag">AI</i></div>`;
     const btns = [...el.querySelectorAll('.pot')], miss = msg => mistakes(o, MAXMISS, msg);
     const fly = (i, txt) => { const f = btns[i].querySelector('.fly'); f.textContent = txt; f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); };
     const show = now => btns.forEach((b, i) => { const p = P[i], ripe = p.ripe > 0, perfect = ripe && now - p.ripe < PERFECT, thirsty = p.water < 0.25 && !ripe && !p.wilt;
       const left = ripe ? 1 - (now - p.ripe) / WILT : 0;
-      b.querySelector('.pl').textContent = p.wilt ? '🥀' : ripe ? '🥬' : p.g < 0.6 ? '🌱' : '🌿'; b.classList.toggle('tiny', !p.wilt && !ripe && p.g < 0.3); // a tiny sprout at first
+      const look = p.wilt ? 'wilt' : ripe ? 'lettuce' : p.g < 0.6 ? 'sprout' : 'young'; // PixelLab pictures in assets/pixellab/garden/
+      if (b.dataset.look !== look) { b.dataset.look = look; b.querySelector('.pl').innerHTML = `<img src="${GARDEN}${look}.png" alt="">`; } b.classList.toggle('tiny', !p.wilt && !ripe && p.g < 0.3); // a tiny sprout at first
       b.style.setProperty('--g', ripe ? left : p.g); b.classList.toggle('ripe', ripe); b.classList.toggle('late', ripe && left < 0.35); b.classList.toggle('dry', thirsty);
       b.classList.toggle('hasbug', !!p.bug); b.classList.toggle('perfect', perfect);
       b.setAttribute('aria-label', p.bug ? 'mold on this plant: tap to wipe it' : p.wilt ? 'wilted' : perfect ? 'just ripe: pick it now for 2 points' : ripe ? 'ripe lettuce: pick it' : thirsty ? 'thirsty plant: tap to water' : `growing, ${Math.round(p.g * 100)} %`); });
