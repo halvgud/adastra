@@ -438,7 +438,17 @@
       let best = {}; try { best = JSON.parse(store.get('jamt-best') || '{}') || {}; } catch (e) {}
       const record = win && (!best[j] || secs < best[j]); if (record) { best[j] = secs; store.set('jamt-best', JSON.stringify(best)); }
       const streak = win ? (+store.get('jamt-streak') || 0) + 1 : 0; store.set('jamt-streak', String(streak));
-      if (win) { S.mg = S.mg || {}; S.mg[j] = true; SFX.win(); FX = { kind: 'confetti', t0: performance.now(), dur: 2200 };
+      if (win) { S.mg = S.mg || {}; S.mg[j] = true; }
+      // Science trip won: first a 10-second walk outside (js/eva.js), then the result card. Tap or "Skip" to jump ahead.
+      if (win && j === 'trip' && !still && window.JAMT_EVA) {
+        const team = S.jobs.map((jj, k) => jj === 'trip' ? k : -1).filter(k => k >= 0), buddy = team.find(k => k !== 0);
+        popup(`<h2>🚀 Out on the surface…</h2><div id="evahost"></div>`); $('popcard').classList.add('mgcard');
+        JAMT_EVA.play($('evahost'), { world: S.world, partner: SPR.back[buddy != null ? buddy : 1] || null,
+          sound: k => k === 'door' ? beep([[220, .25], [180, .3]], 'sawtooth', .025) : beep([[90, .05]], 'triangle', .05) }, () => show());
+        return; }
+      show();
+      function show() {
+      if (win) { SFX.win(); FX = { kind: 'confetti', t0: performance.now(), dur: 2200 };
         for (let i = 0; i < rate; i++) setTimeout(() => beep([[784 * Math.pow(2, i * 4 / 12), .09], [1047 * Math.pow(2, i * 4 / 12), .14]], 'square', .05), 650 + i * 330); } else SFX.lose();
       const praise = ['Good job!', 'Great work!', 'PERFECT!'][rate - 1] || 'Good try!';
       const burst = win && !still ? `<div class="burst" aria-hidden="true">${Array.from({ length: 28 }, (_, i) => `<i style="--x:${Math.round(Math.cos(i * 2.4) * (90 + (i * 37) % 120))}px;--y:${Math.round(Math.sin(i * 2.4) * (70 + (i * 53) % 110))}px;--r:${(i * 47) % 360}deg;background:${['#F0E442', '#56B4E9', '#009E73', '#CC79A7', '#E69F00'][i % 5]};animation-delay:${(i % 7) * 25}ms"></i>`).join('')}</div>` : '';
@@ -447,7 +457,7 @@
           <p class="wins">⏱ ${secs} s${record ? ' · <b class="rec">🏆 New best time!</b>' : best[j] ? ` · best ${best[j]} s` : ''}${streak > 1 ? ` · 🔥 <b>${streak} in a row!</b>` : ''}</p>` : ''}
         ${mcSay(win ? `You did it, ${CMD()}! Bonus: <b>${miniBonus(j)}</b> when the ${S.unit} ends.` : `${msg || 'Time is up.'} The job still gets done today. You can try again tomorrow.`)}
         <div class="fact"><span class="tag2 real">REAL</span>${G.fact}</div><div class="src">${src ? src.name : ''} · the puzzle itself is a game.</div>
-        <button class="big primary" data-close>OK</button>`); hud(); };
+        <button class="big primary" data-close>OK</button>`); hud(); } };
     const say = t => { const tp = $('mgtip'); if (tp) { tp.textContent = t; tp.classList.remove('show'); void tp.offsetWidth; tp.classList.add('show'); } if (combo > 1) SFX.off(); combo = 0; };
     $('mgskip').onclick = () => { over = true; clearTimer(); SFX.tap(); closeAll(); hud(); };
     const o = { rng: SIM.rng(S.code * 97 + S.day * 7 + j.length), win: () => end(true), lose: m => end(false, m), say,
