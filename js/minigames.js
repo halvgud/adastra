@@ -151,7 +151,7 @@
   // Mold comes more often as the basket fills. Plants keep ripening the whole time, so it can always be won.
   const GARDEN = 'assets/pixellab/garden/';
   ['lettuce', 'sprout', 'young', 'wilt', 'mold', 'drop'].forEach(n => { new Image().src = GARDEN + n + '.png'; });
-  ['cardback', 'solar', 'dust', 'steel', 'sandbag', 'ground-moon', 'ground-mars'].forEach(n => { new Image().src = 'assets/pixellab/mg/' + n + '.png'; }); // loaded early, so the puzzle never shows empty pots
+  ['cardback', 'solar', 'dust', 'steel', 'sandbag', 'ground-moon', 'ground-mars', 'rock-basalt', 'rock-bright', 'rock-ice', 'bin', 'valve', 'cabin'].forEach(n => { new Image().src = 'assets/pixellab/mg/' + n + '.png'; }); // loaded early, so the puzzle never shows empty pots
   function tend(el, o) {
     const R = o.rng, N = 12, GOAL = 12, WILT = 6500, MAXRIPE = 3, PERFECT = 1100, MAXMISS = 5, GROW = () => 1 / (11000 + R() * 7000);
     const P = Array.from({ length: N }, () => ({ g: R() * 0.45, speed: GROW(), water: 0.45 + R() * 0.55, bug: 0, ripe: 0, wilt: 0, pop: 0 }));
@@ -214,11 +214,13 @@
   // A wrong valve is a mistake (3 allowed) and the round plays again. Win after 4 rounds (3, 4, 5 then 6 valves).
   function valves(el, o) {
     const R = o.rng, N = 6, ROUNDS = [3, 4, 5, 6], COLS = ['#e85d5d', '#f0b429', '#3ddc97', '#56B4E9', '#b07ce8', '#ff8fd0'];
+    const HUE = [0, 45, 135, 200, 270, 320]; // the PixelLab wheel is red: turn it into each valve's colour
     const seq = Array.from({ length: 6 }, () => Math.floor(R() * N)); let round = 0, pos = 0, busy = true, over = false; const timers = [];
-    el.innerHTML = `<p class="mgq">Round <b id="mgr">1</b>/${ROUNDS.length} · <span id="mgw">watch…</span></p><div class="valves">${COLS.map((c, i) =>
-      `<button class="valve" data-i="${i}" style="--vc:${c}" aria-label="Valve ${i + 1}"><i></i></button>`).join('')}</div>`;
+    el.innerHTML = `<p class="mgq">Round <b id="mgr">1</b>/${ROUNDS.length} · <span id="mgw">watch…</span></p><div class="vrounds">${ROUNDS.map((_, i) => `<i data-r="${i}"></i>`).join('')}</div>
+      <div class="valves">${COLS.map((c, i) => `<button class="valve" data-i="${i}" style="--vc:${c};--hue:${HUE[i]}deg" aria-label="Valve ${i + 1}"><img src="${'assets/pixellab/mg/valve.png'}" alt=""><b class="steam"></b></button>`).join('')}</div>`;
     const btns = [...el.querySelectorAll('.valve')], later = (f, ms) => timers.push(setTimeout(() => { if (!over && el.isConnected) f(); }, ms));
-    const flash = (i, ms) => { btns[i].classList.add('lit'); later(() => btns[i].classList.remove('lit'), ms); };
+    const flash = (i, ms) => { const b = btns[i]; b.classList.remove('lit'); void b.offsetWidth; b.classList.add('lit'); later(() => b.classList.remove('lit'), ms); };
+    const dots = () => el.querySelectorAll('.vrounds i').forEach((d, i) => { d.className = i < round ? 'done' : i === round ? 'now' : ''; });
     const show = () => { busy = true; pos = 0; el.querySelector('#mgw').textContent = 'watch…'; const n = ROUNDS[round];
       for (let k = 0; k < n; k++) later(() => { flash(seq[k], 420); o.tap(); }, 600 + k * 620);
       later(() => { busy = false; el.querySelector('#mgw').textContent = 'your turn!'; }, 600 + n * 620); };
@@ -226,9 +228,9 @@
       if (i !== seq[pos]) { mistakes(o, 3, 'Wrong valve! Watch again.'); if (!over) later(show, 500); return; }
       o.tap(); pos += 1; if (pos < ROUNDS[round]) return;
       round += 1; if (round >= ROUNDS.length) { over = true; setTimeout(o.win, 400); return; }
-      el.querySelector('#mgr').textContent = round + 1; later(show, 500); });
+      el.querySelector('#mgr').textContent = round + 1; dots(); el.querySelector('.valves').classList.add('flow'); later(() => el.querySelector('.valves').classList.remove('flow'), 700); later(show, 800); });
     const lose = o.lose; o.lose = m => { over = true; timers.forEach(clearTimeout); lose(m); };
-    show();
+    dots(); show();
   }
 
   // 🔬 Lab, second game: Rock sorter. A sample comes in with a clue; put it in the right box. 10 right answers win.
@@ -239,14 +241,19 @@
       { id: 'bright', name: 'Bright highland rock', icon: '⛰️', clues: ['Almost white, from the high mountains', 'Light and bright, with shiny crystals', 'Very old, pale rock from the highlands'], col: '#d9d6cc' },
       { id: 'ice', name: 'Ice', icon: '🧊', clues: ['Melts if it gets warm!', 'Found in dark craters that never see the Sun', 'Clear and cold: it can become drinking water'], col: '#bfe8ff' }];
     let n = 0, cur = null, last = -1, over = false;
-    el.innerHTML = `<p class="mgq">Sorted: <b id="mgn">0</b>/${GOAL}</p><div class="sorter"><div class="sample" id="mgs"><i class="rock"></i><span id="mgc"></span></div>
-      <div class="bins">${KINDS.map((k, i) => `<button class="bin" data-i="${i}"><span class="e">${k.icon}</span>${k.name}</button>`).join('')}</div></div>`;
+    const pic = k => 'assets/pixellab/mg/rock-' + k.id + '.png'; // PixelLab samples
+    el.innerHTML = `<p class="mgq">Sorted: <b id="mgn">0</b>/${GOAL}</p><div class="sorter"><div class="sample" id="mgs"><span class="tray"><img class="rock" alt=""></span><span class="clue"><small>Clue</small><span id="mgc"></span></span></div>
+      <div class="bins">${KINDS.map((k, i) => `<button class="bin" data-i="${i}"><span class="pile"></span><img class="crate" src="${'assets/pixellab/mg/bin.png'}" alt=""><img class="tag" src="${pic(k)}" alt=""><span class="nm">${k.name}</span></button>`).join('')}</div></div>`;
     const next = () => { let i; do i = Math.floor(R() * 3); while (i === last && R() < 0.6); last = i; const k = KINDS[i]; cur = i;
-      el.querySelector('#mgc').textContent = k.clues[Math.floor(R() * k.clues.length)]; const rk = el.querySelector('.rock'); rk.style.background = k.col;
+      el.querySelector('#mgc').textContent = k.clues[Math.floor(R() * k.clues.length)]; el.querySelector('.sample .rock').src = pic(k);
       const s = el.querySelector('#mgs'); s.classList.remove('in'); void s.offsetWidth; s.classList.add('in'); };
+    const fly = b => { const from = el.querySelector('.sample .rock').getBoundingClientRect(), to = b.querySelector('.crate').getBoundingClientRect(), f = new Image(); // the sample flies into its crate
+      f.src = el.querySelector('.sample .rock').src; f.className = 'flyrock'; f.style.left = from.left + 'px'; f.style.top = from.top + 'px'; document.body.appendChild(f);
+      requestAnimationFrame(() => { f.style.transform = `translate(${to.left + to.width / 2 - from.left - 22}px, ${to.top - from.top - 10}px) scale(.6) rotate(200deg)`; f.style.opacity = '.4'; });
+      setTimeout(() => { f.remove(); const p = b.querySelector('.pile'); if (p.children.length < 6) { const r = new Image(); r.src = f.src; r.style.left = (8 + p.children.length * 13) % 60 + '%'; p.appendChild(r); } b.classList.remove('got'); void b.offsetWidth; b.classList.add('got'); }, 380); };
     el.querySelectorAll('.bin').forEach(b => b.onclick = () => { if (over) return; const i = +b.dataset.i;
       if (i !== cur) { b.classList.remove('no'); void b.offsetWidth; b.classList.add('no'); mistakes(o, 3, 'Not that one. Read the clue again!'); return; }
-      o.tap(); n += 1; el.querySelector('#mgn').textContent = n; if (n >= GOAL) { over = true; setTimeout(o.win, 300); return; } next(); });
+      o.tap(); fly(b); n += 1; el.querySelector('#mgn').textContent = n; if (n >= GOAL) { over = true; setTimeout(o.win, 600); return; } setTimeout(() => { if (!over) next(); }, 250); });
     const lose = o.lose; o.lose = m => { over = true; lose(m); };
     next();
   }
@@ -255,13 +262,13 @@
   // inside the glowing band. 8 calm breaths win; a tap at the wrong moment is a mistake (3 allowed).
   function breath(el, o) {
     const GOAL = 8, PERIOD = 4200; let n = 0, over = false, lastHit = -1e9; const t0 = performance.now();
-    el.innerHTML = `<p class="mgq">Calm breaths: <b id="mgn">0</b>/${GOAL}</p><button class="breath" aria-label="Tap when the ring is biggest"><i class="band"></i><i class="ring"></i><span id="mgb">breathe in…</span></button>`;
+    el.innerHTML = `<p class="mgq">Calm breaths: <b id="mgn">0</b>/${GOAL}</p><div class="bstars">${Array.from({ length: GOAL }, () => '<i></i>').join('')}</div><button class="breath" aria-label="Tap when the ring is biggest"><i class="band"></i><i class="ring"></i><i class="glow"></i><span id="mgb">breathe in…</span></button>`;
     const ring = el.querySelector('.ring'), word = el.querySelector('#mgb'), size = t => 0.35 + 0.65 * (0.5 - 0.5 * Math.cos((t - t0) / PERIOD * 2 * Math.PI));
-    const tick = () => { if (over || !el.isConnected) return; const now = performance.now(), s = size(now); ring.style.transform = `scale(${s})`;
+    const tick = () => { if (over || !el.isConnected) return; const now = performance.now(), s = size(now); ring.style.transform = `scale(${s})`; el.querySelector('.glow').style.opacity = (s - 0.35) * 0.9;
       const inn = Math.sin((now - t0) / PERIOD * 2 * Math.PI) > 0; word.textContent = s > 0.88 ? 'tap now!' : inn ? 'breathe in…' : 'breathe out…'; el.querySelector('.breath').classList.toggle('ready', s > 0.88); requestAnimationFrame(tick); };
     el.querySelector('.breath').onclick = () => { if (over) return; const now = performance.now(), s = size(now);
       if (s > 0.88) { if (now - lastHit < PERIOD * 0.6) return; // extra taps in the same breath are simply ignored
-        lastHit = now; n += 1; o.tap(); el.querySelector('#mgn').textContent = n; if (n >= GOAL) { over = true; setTimeout(o.win, 300); } }
+        lastHit = now; n += 1; o.tap(); el.querySelector('#mgn').textContent = n; const st = el.querySelectorAll('.bstars i')[n - 1]; if (st) st.className = 'on'; if (n >= GOAL) { over = true; setTimeout(o.win, 300); } }
       else mistakes(o, 3, 'Wait until the ring is biggest.'); };
     const lose = o.lose; o.lose = m => { over = true; lose(m); };
     requestAnimationFrame(tick);

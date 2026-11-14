@@ -152,7 +152,7 @@
     g.putImageData(d, 0, 0); return c;
   }
   async function loadArt() {
-    const jobs = [load('bg_moon', ART + 'bg/moon.png'), load('bg_mars', ART + 'bg/mars.png'), ...['moon2', 'moon3', 'mars2'].map(k => load('bg_' + k, ART + 'bg/' + k + '.png')), load('panels', ART + 'props/solar-panels.png'), load('reactor', ART + 'props/reactor.png'), load('rover', ART + 'props/rover.png'), ...['soil-moon', 'soil-mars', 'tunnel', 'shaft', 'hatch'].map(n => load('base_' + n, ART + 'base/' + n + '.png')), load('south', ART + 'astronaut/Idle/rotations/south.png'), load('north', ART + 'astronaut/Idle/rotations/north.png')];
+    const jobs = [load('bg_moon', ART + 'bg/moon.png'), load('bg_mars', ART + 'bg/mars.png'), ...['moon2', 'moon3', 'mars2'].map(k => load('bg_' + k, ART + 'bg/' + k + '.png')), load('panels', ART + 'props/solar-panels.png'), load('reactor', ART + 'props/reactor.png'), load('rover', ART + 'props/rover.png'), ...['soil-moon', 'soil-mars', 'tunnel', 'shaft', 'hatch', 'entry-moon', 'entry-mars'].map(n => load('base_' + n, ART + 'base/' + n + '.png')), load('south', ART + 'astronaut/Idle/rotations/south.png'), load('north', ART + 'astronaut/Idle/rotations/north.png')];
     ROOMS.forEach(r => jobs.push(load('room_' + r.img, ART + 'rooms/' + r.img + '.png'), load('cell_' + r.id, ART + 'cells/' + r.id + '.png'), load('roomm_' + r.img, ART + 'rooms/' + r.img + '-mars.png'), load('roomn_' + r.img, ART + 'rooms/' + r.img + '-moon.png'), load('cellm_' + r.id, ART + 'cells/' + r.id + '-mars.png')));
     Object.keys(MISSIONS).forEach(k => jobs.push(load('patch_' + k, patchSrc(k))));
     // Each animation is one strip of frames side by side (assets/pixellab/astronaut/strips/, made by tools/build_atlas.py)
@@ -226,7 +226,7 @@
     const g = PANELS_DARK.getContext('2d'); g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, im.width, im.height); g.drawImage(im, 0, 0);
     g.globalCompositeOperation = 'source-atop'; g.fillStyle = `rgba(0,0,0,${a})`; g.fillRect(0, 0, im.width, im.height); g.globalCompositeOperation = 'source-over'; return PANELS_DARK; }
   function drawOutside(t, k, p, job) {
-    const zone = job === 'clean' ? [258, 370] : job === 'regolith' ? [20, 150] : [20, 236], foot = SKY - 5;
+    const zone = job === 'clean' ? [258, 370] : job === 'regolith' ? [88, 160] : [88, 236], foot = SKY - 5;
     if (p.ox === undefined || p.ojob !== job) { p.ox = zone[0] + 10 + k * 14; p.otx = p.ox; p.ojob = job; p.onext = 0; }
     if (Math.abs(p.otx - p.ox) < 1 && t > p.onext) { p.otx = zone[0] + Math.random() * (zone[1] - zone[0]); p.onext = t + 1600 + Math.random() * 2600; }
     const dx = p.otx - p.ox, moving = Math.abs(dx) > 1; if (moving) { p.ox += Math.sign(dx) * 0.55; p.ofacing = Math.sign(dx); }
@@ -289,12 +289,13 @@
   const BEDS_CELL = [[80, 64, false], [80, 33, false], [32, 72, true], [100, 72, true]]; // the same, in the base's shelter cell (128 x 80)
   const BEDS_CELL_MARS = [[103, 54, false], [103, 33, false], [30, 72, true], [58, 72, true]]; // Mars shelter cell: two pods on the right
   function bedSpot(k, cell) { const B = cell ? (S.world === 'mars' && IMG.cellm_shelter ? BEDS_CELL_MARS : BEDS_CELL) : BEDS, i = S.jobs.filter((j, kk) => j === 'rest' && kk < k).length; return B[Math.min(i, B.length - 1)]; }
-  function drawSleeper(t, k, x, y, s, bag) { // lying on the back, head on the right, under a blanket; breathing and z's
+  function drawSleeper(t, k, x, y, s, bag, ang) { // lying on the back, head on the right, under a blanket; breathing and z's. ang tilts them with a bunk seen in perspective
     const fr = spr(k, 'idle', true)[0]; if (!fr) return; const br = still ? 0 : Math.sin(t / 700 + k) * 0.8 * s;
+    ctx.save(); if (ang) { ctx.translate(x, y); ctx.rotate(ang); ctx.translate(-x, -y); }
     if (bag) { ctx.fillStyle = '#2f5d8a'; ctx.fillRect(x - 32 * s, y - 9 * s, 56 * s, 18 * s); ctx.fillStyle = '#4a86c2'; ctx.fillRect(x - 32 * s, y - 9 * s, 56 * s, 4 * s); } // sleeping bag
     ctx.save(); ctx.translate(x, y - br); ctx.rotate(Math.PI / 2); ctx.drawImage(fr, -34 * s, -34 * s, 68 * s, 68 * s); ctx.restore();
     ctx.fillStyle = bag ? '#3b74b0' : '#7a5aa8'; ctx.fillRect(x - 30 * s, y - 8 * s - br, 36 * s, 16 * s);            // blanket up to the chest
-    ctx.fillStyle = bag ? '#5c97d6' : '#9677c4'; ctx.fillRect(x - 30 * s, y - 8 * s - br, 36 * s, 3 * s); ctx.fillRect(x - 6 * s, y - 8 * s - br, 3 * s, 16 * s);
+    ctx.fillStyle = bag ? '#5c97d6' : '#9677c4'; ctx.fillRect(x - 30 * s, y - 8 * s - br, 36 * s, 3 * s); ctx.fillRect(x - 6 * s, y - 8 * s - br, 3 * s, 16 * s); ctx.restore();
     if (!still) { const zph = (t / 1600 + k * 0.3) % 1; ctx.globalAlpha = 1 - zph; text('z', x + 20 * s + zph * 14 * s, y - 14 * s - zph * 30 * s, '#cfe3ff', Math.max(8, (9 + zph * 6) * s * 1.6)); ctx.globalAlpha = 1; } }
   // The rooms are one base dug into the ground, seen as a cut-away from the side: soil around them, pressurised tunnels
   // between neighbours, ladder shafts between the two floors, and a hatch on the surface above the airlock.
@@ -311,8 +312,8 @@
       if (tun) ctx.drawImage(tun, x - 26, y, 52, 26); else { ctx.fillStyle = '#9aa0ab'; ctx.fillRect(x - 24, y + 8, 48, 10); } }
     [[0, 96], [2, 34]].forEach(([col, dx]) => { const x = col * RW + dx, y = SKY + RH - 22; // ladder shafts between the floors
       if (sh) ctx.drawImage(sh, x - 9, y, 18, 44); else { ctx.fillStyle = '#9aa0ab'; ctx.fillRect(x - 6, y, 12, 44); } });
-    const hx = 36; if (sh) ctx.drawImage(sh, hx - 10, SKY - 8, 20, 26); // from the surface hatch down to the airlock
-    if (IMG.base_hatch) ctx.drawImage(IMG.base_hatch, hx - 33, SKY - 42, 66, 44); // the way out: about as big as a solar panel
+    const hx = 36, ent = IMG[moon ? 'base_entry-moon' : 'base_entry-mars']; if (sh) ctx.drawImage(sh, hx - 10, SKY - 8, 20, 26); // from the surface entrance down to the airlock
+    if (ent) ctx.drawImage(ent, hx - 38, SKY - 50, 82, 55); else if (IMG.base_hatch) ctx.drawImage(IMG.base_hatch, hx - 33, SKY - 42, 66, 44); // the way out: a small dome covered in soil bags, with a round door
     ctx.imageSmoothingEnabled = sm; }
   // A ladder through a hatch in the floor: from the upper room down to the lower room's floor (rails, rungs, the dark hatch).
   function drawLadders() { LADDERS.forEach(lx => { const top = SKY + RH - 34, bot = SKY + 2 * RH - FLOOR, hy = SKY + RH;
@@ -389,9 +390,10 @@
       const busy = !moving && !still && JOBANIM[job] && actFrame(k, JOBANIM[job], t, indoor); // watering, repairing
       drawSprite(busy || fr[Math.floor(t / (moving ? 110 : 260)) % fr.length], p.x, ry + RH - FLOOR - hop - (busy ? 0 : work), p.facing, BASE_SCALE);
       if (!moving && !still) jobFx(t, k, job, p.x + p.facing * 14, ry + RH - 34);
-      if (k === 0) text('★', p.x, ry + 16 - hop, '#ff9a3c', 9); if (selected === k) { ctx.fillStyle = '#F0E442'; ctx.fillRect(p.x - 3, ry + 4, 6, 6); }
-      if (live) { const by = ry + 2 - hop; ctx.fillStyle = '#fff'; ctx.fillRect(p.x - 9, by - 13, 18, 15); ctx.fillRect(p.x - 2, by + 2, 4, 3); ctx.fillStyle = '#000'; ctx.fillRect(p.x - 9, by - 13, 18, 1);
-        ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; if (window.JAMT_ICON && JAMT_ICON.hasIcon(md.e)) JAMT_ICON.draw(ctx, md.e, p.x, by - 1, 10, () => {}); else ctx.fillText(md.e, p.x, by - 2); ctx.textAlign = 'left'; } });
+      const head = ry + RH - FLOOR - 44 - hop; // just above the head (the sprites are drawn at BASE_SCALE)
+      if (k === 0) text('★', p.x - (live ? 12 : 0), head + 2, '#ff9a3c', 9); if (selected === k) { ctx.fillStyle = '#F0E442'; ctx.fillRect(p.x - 3, head - (live ? 18 : 8), 6, 6); }
+      if (live) { const by = head; ctx.fillStyle = 'rgba(15,18,30,.85)'; ctx.fillRect(p.x - 7, by - 11, 14, 12); ctx.fillRect(p.x - 1, by + 1, 3, 2); ctx.fillStyle = '#4b5263'; ctx.fillRect(p.x - 7, by - 12, 14, 1); // a small dark thought bubble
+        ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; if (window.JAMT_ICON && JAMT_ICON.hasIcon(md.e)) JAMT_ICON.draw(ctx, md.e, p.x, by - 1, 9, () => {}); else ctx.fillText(md.e, p.x, by - 2); ctx.textAlign = 'left'; } });
     if (IMG.cell_lab) drawDoorFronts(); // doorways in front of whoever walks through them
   }
   // Animations inside a zoomed room (the room art fills x 0–384, y 40–280). Skipped when the player prefers reduced motion.
@@ -451,7 +453,7 @@
     if (r.id === 'oxygen' && s.broken) { ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillRect(92, 44, 200, 24); text('💥 RECYCLER BROKEN', 192, 61, '#ff7a3c', 15); } // at the top, so it never covers the lines below
     C.lines.forEach((ln, i) => text(ln, 192, (r.id === 'greenhouse' ? 318 : 306) + i * 18, '#fff', 13));
     const here = S.jobs.map((j, kk) => (j ? roomFor(j) === r.id : crewPos[kk].room === ri) ? kk : -1).filter(kk => kk >= 0); // workers, and free crew resting here
-    here.forEach((kk, i) => { if (S.jobs[kk] === 'rest' && !(t - (CHEER[kk] || -1e9) < 1260)) { const [ax, ay, bag] = bedSpot(kk); drawSleeper(t, kk, ax, ay, 0.8, bag); return; } // in a bunk or sleeping bag
+    here.forEach((kk, i) => { if (S.jobs[kk] === 'rest' && !(t - (CHEER[kk] || -1e9) < 1260)) { const [ax, ay, bag] = bedSpot(kk); drawSleeper(t, kk, ax, ay - 2, 0.66, bag, bag ? 0 : ax < 192 ? -0.16 : 0.16); return; } // the bunks recede toward the middle of the picture // in a bunk or sleeping bag
       const indoor = r.id !== 'airlock', fr = spr(kk, 'idle', indoor), jt = t - (JUMP[kk] || -9999), cheer = !still && actFrame(kk, 'cheer', t, indoor);
       const hop = !cheer && jt < 500 && !still ? Math.sin(jt / 500 * Math.PI) * 26 : 0; // tapped: a happy jump (or a little hop)
       const rt = ROUTINES[S.jobs[kk] || 'free']; // move in depth along the room's aisle
@@ -1089,7 +1091,7 @@
     const L = feed.level, src = DATA.sources[feed.source]; sunWord = L.word; sunMult = L.mult; SIM.setSun(L); FEED_STATUS[feed.source] = feed.status;
     const score = c => ('BCMX'.indexOf(c[0]) * 100) + parseFloat(c.slice(1) || 0), big = (feed.flares || []).filter(f => f.cls).sort((a, b) => score(b.cls) - score(a.cls))[0];
     BIGFLARE = big ? `${big.cls}${big.peak ? ' on ' + new Date(big.peak).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''}` : '';
-    sunInfo = `<span class="tag2 ${STATUS_TAG[feed.status]}">${feed.status}</span> ${src.name} · ${feed.note}<p>In the last ${src.days} days the real Sun made <b>${L.total}</b> ${w('flare', 'flares')}: ${L.x} big (X), ${L.m} medium (M), ${L.small} small. Particle storms: <b>${L.particleStorms ? 'yes' : 'none'}</b>.</p><p>${BIGFLARE ? `<p>Biggest flare: <b>${BIGFLARE}</b>.</p>` : ''}<p>So the Sun this week is <b>${L.face}</b>. This only matters in the two missions with solar storms (<b>Solar storm!</b> and <b>Call Earth</b>): their storm will be <b>${L.size}</b>. In the other missions it changes nothing.</p><div class="src"><span class="tag2 rule">GAME RULE</span>The real Sun sets how big storms are. Game days are not real days. · ${src.name}: ${src.url.replace('https://', '').replace(/\/$/, '')}</div>`;
+    sunInfo = `<span class="tag2 ${STATUS_TAG[feed.status]}">${feed.status}</span> ${src.name} · ${feed.note}<p>This week the real Sun is <b>${L.face}</b>. It made <b>${L.total}</b> ${w('flare', 'flares')}.</p><p>In <b>Solar storm!</b> and <b>Call Earth</b>, the storm will be <b>${L.size}</b>.</p><div class="src">${src.name}: ${src.url.replace('https://', '').replace(/\/$/, '')}</div>`;
   }
   async function loadSun() { setSun(await FEEDS.sun(new URLSearchParams(location.search))); }
   function placeSunButton() { const [x, y, r] = SUNPOS(), k = $('base').clientWidth / CW, R = r + 6;
