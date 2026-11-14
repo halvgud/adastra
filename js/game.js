@@ -133,13 +133,15 @@
     g.putImageData(d, 0, 0); return c;
   }
   async function loadArt() {
-    const jobs = [load('bg_moon', ART + 'bg/moon.png'), load('bg_mars', ART + 'bg/mars.png'), load('panels', ART + 'props/solar-panels.png'), load('reactor', ART + 'props/reactor.png'), load('south', ART + 'astronaut/Idle/rotations/south.png'), load('north', ART + 'astronaut/Idle/rotations/north.png')];
+    const jobs = [load('bg_moon', ART + 'bg/moon.png'), load('bg_mars', ART + 'bg/mars.png'), load('panels', ART + 'props/solar-panels.png'), load('reactor', ART + 'props/reactor.png'), load('rover', ART + 'props/rover.png'), load('south', ART + 'astronaut/Idle/rotations/south.png'), load('north', ART + 'astronaut/Idle/rotations/north.png')];
     ROOMS.forEach(r => jobs.push(load('room_' + r.img, ART + 'rooms/' + r.img + '.png')));
     Object.keys(MISSIONS).forEach(k => jobs.push(load('patch_' + k, patchSrc(k))));
-    for (let i = 0; i < 6; i++) jobs.push(load('walk' + i, `${ART}astronaut/Idle/animations/walk/east/frame_00${i}.png`));
-    for (let i = 0; i < 4; i++) jobs.push(load('idle' + i, `${ART}astronaut/Idle/animations/idle/east/frame_00${i}.png`));
-    Object.entries(ACTS).forEach(([a, d]) => { for (let i = 0; i < ACT_FRAMES; i++) jobs.push(load(`act_${a}${i}`, `${ART}astronaut/Idle/animations/${a}/${d}/frame_00${i}.png`)); });
+    // Each animation is one strip of frames side by side (assets/pixellab/astronaut/strips/, made by tools/build_atlas.py)
+    ['walk', 'idle', ...Object.keys(ACTS)].forEach(a => jobs.push(load('strip_' + a, `${ART}astronaut/strips/${a}.png`)));
     await Promise.all(jobs);
+    const cut = (a, key) => { const st = IMG['strip_' + a]; if (!st) return; const h = st.height, n = Math.round(st.width / h);
+      for (let i = 0; i < n; i++) { const c = document.createElement('canvas'); c.width = c.height = h; c.getContext('2d').drawImage(st, i * h, 0, h, h, 0, 0, h, h); IMG[key(i)] = c; } };
+    cut('walk', i => 'walk' + i); cut('idle', i => 'idle' + i); Object.keys(ACTS).forEach(a => cut(a, i => `act_${a}${i}`));
     ROOMS.forEach(r => { if (IMG['room_' + r.img]) IMG['room_' + r.img] = keyOut(IMG['room_' + r.img]); });
     CREW.forEach((c, k) => { SPR.walk[k] = []; SPR.idle[k] = [];
       const look = (key, img) => { const cv = recolor(img, c.col); return k === 0 && COMMANDER.glasses ? addGlasses(cv, key) : cv; };
@@ -185,6 +187,11 @@
   // ---------- the crew and the world move on their own ----------
   const OUTSIDE = { trip: 'samples', clean: 'panels', regolith: 'soil' }; // jobs done out on the surface
   let PANELS_DARK = null; // the panel picture with a dark tint on its own pixels only (source-atop), redrawn each frame
+  let PANELS_GLINT = null; // a slanted stripe of light, kept only where the panel picture has pixels
+  function panelGlint(k) { const im = IMG.panels; if (!PANELS_GLINT) { PANELS_GLINT = document.createElement('canvas'); PANELS_GLINT.width = im.width; PANELS_GLINT.height = im.height; }
+    const g = PANELS_GLINT.getContext('2d'), x = k * im.width; g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, im.width, im.height); g.drawImage(im, 0, 0);
+    g.globalCompositeOperation = 'destination-in'; g.fillStyle = '#000'; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 7, 0); g.lineTo(x - 9, im.height); g.lineTo(x - 16, im.height); g.fill();
+    g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(255,255,255,.45)'; g.fillRect(0, 0, im.width, im.height); g.globalCompositeOperation = 'source-over'; return PANELS_GLINT; }
   function shadedPanels(a) { const im = IMG.panels; if (!PANELS_DARK) { PANELS_DARK = document.createElement('canvas'); PANELS_DARK.width = im.width; PANELS_DARK.height = im.height; }
     const g = PANELS_DARK.getContext('2d'); g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, im.width, im.height); g.drawImage(im, 0, 0);
     g.globalCompositeOperation = 'source-atop'; g.fillStyle = `rgba(0,0,0,${a})`; g.fillRect(0, 0, im.width, im.height); g.globalCompositeOperation = 'source-over'; return PANELS_DARK; }
@@ -208,12 +215,10 @@
     if (job === 'tend') for (let i = 0; i < 3; i++) { const ph = ((t / 700) + i / 3) % 1; ctx.fillStyle = `rgba(120,200,255,${1 - ph})`; ctx.fillRect(x + i * 2, y + 6 + ph * 18, 1, 3); }
     if (job === 'fix' && Math.sin(t / 90 + k) > 0.6) { ctx.fillStyle = '#ffe76a'; ctx.fillRect(x, y + 4, 2, 2); ctx.fillRect(x + 3, y + 1, 1, 1); ctx.fillRect(x - 2, y + 7, 1, 1); }
   }
-  function drawRover(t, moon) { // a small rover crosses the plain now and then
-    const ph = (t / 34000) % 1; if (ph > 0.55) return; const k = ph / 0.55, x = -30 + k * (CW + 60), y = SKY - 22 + Math.sin(k * 40) * 0.6;
-    ctx.fillStyle = moon ? '#d8dce4' : '#e8e2d6'; ctx.fillRect(x | 0, y | 0, 16, 5); ctx.fillStyle = '#56B4E9'; ctx.fillRect((x + 3) | 0, (y - 3) | 0, 5, 3);
-    ctx.fillStyle = '#9aa0a6'; ctx.fillRect((x + 12) | 0, (y - 6) | 0, 1, 6); ctx.fillStyle = '#F0E442'; ctx.fillRect((x + 11) | 0, (y - 7) | 0, 3, 1);
-    ctx.fillStyle = '#222'; [1, 6, 11].forEach(w => ctx.fillRect((x + w) | 0, (y + 5) | 0, 4, 3));
-    if (!moon) { ctx.fillStyle = 'rgba(214,150,96,.5)'; ctx.fillRect((x - 6) | 0, (y + 4) | 0, 5, 2); } }
+  function drawRover(t, moon) { // a small rover (PixelLab picture, assets/pixellab/props/rover.png) crosses the plain now and then
+    const ph = (t / 34000) % 1; if (ph > 0.55) return; const k = ph / 0.55, w = 32, h = 20, x = -40 + k * (CW + 80), y = SKY - 30 + Math.abs(Math.sin(k * 60)) * -0.8;
+    if (!moon) for (let i = 0; i < 5; i++) { const a = (i + (t / 120) % 1) / 5; ctx.fillStyle = `rgba(214,150,96,${0.45 * (1 - a)})`; ctx.fillRect((x - 4 - a * 18) | 0, (y + h - 4 - a * 5) | 0, 3 + a * 4, 2); } // dust behind it on Mars
+    if (IMG.rover) { const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false; ctx.drawImage(IMG.rover, x | 0, y | 0, w, h); ctx.imageSmoothingEnabled = sm; } }
   const isOn = r => r.sw ? (r.sw === 'lab' ? S.sw.lab && !S.sw.save : S.sw[r.sw]) : null;
   function disc(x, y, r, fill) { ctx.fillStyle = fill; for (let yy = -r; yy <= r; yy++) for (let xx = -r; xx <= r; xx++) if (xx * xx + yy * yy <= r * r + r) ctx.fillRect(x + xx, y + yy, 1, 1); }
   function drawSun(x, y, r) {
@@ -237,7 +242,6 @@
     const orb = (t / 26000) % 1; if (orb < 0.6) { const k = orb / 0.6, x = -10 + k * (CW + 20), y = 22 + Math.sin(k * 3.14) * -10 + 10; ctx.fillStyle = '#dfe7ff'; ctx.fillRect(x | 0, y | 0, 2, 2); ctx.fillStyle = 'rgba(223,231,255,.35)'; ctx.fillRect((x - 4) | 0, y | 0, 3, 1); } // an orbiter passing over
     if (!moon) { const dd = (t / 18000) % 1; if (dd < 0.5) { const k = dd / 0.5, x = CW + 20 - k * (CW + 60); // a dust devil crossing the plain
         for (let i = 0; i < 9; i++) { const w = 2 + i * 1.2, sw = Math.sin(t / 120 + i) * w; ctx.fillStyle = `rgba(214,150,96,${0.5 - i * 0.04})`; ctx.fillRect((x + sw) | 0, SKY - 6 - i * 4, Math.max(2, w | 0), 3); } } }
-    if (IMG.panels && L > 0.5) { const g = ((t / 2600) % 1.6) - 0.3; if (g > 0 && g < 1) { ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(250 + g * 120, SKY - 58, 6, 40); } } // sunlight glinting on the panels
     const [ox, oy] = roomXY(4); if (S.sw.maker) for (let i = 0; i < 6; i++) { const ph = ((t / 1400) + i / 6) % 1; ctx.fillStyle = `rgba(160,220,255,${0.8 - ph * 0.7})`; ctx.fillRect(ox + 52 + (i % 3) * 9 + Math.sin(t / 300 + i) * 2, oy + 66 - ph * 44, 2, 2); } // bubbles in the air maker
     const [gx, gy] = roomXY(2); if (S.sw.gh) { ctx.fillStyle = `rgba(214,120,255,${0.06 + 0.06 * Math.sin(t / 900)})`; ctx.fillRect(gx + 4, gy + 4, RW - 8, RH - 8); } // grow-lights glow
     const [lx, ly] = roomXY(1); if (S.sw.lab && !S.sw.save && S.jobs.includes('lab')) for (let i = 0; i < 4; i++) { const ph = ((t / 1800) + i / 4) % 1; ctx.fillStyle = `rgba(240,228,66,${1 - ph})`; ctx.fillRect(lx + 30 + i * 18, ly + 60 - ph * 40, 2, 2); } // science sparks
@@ -255,7 +259,8 @@
       if (!still) for (let i = 0; i < 70; i++) { const x = ((i * 53 + t * 0.06 * (1 + i % 3)) % CW), y = (i * 37) % SKY; ctx.fillStyle = '#e8b27a'; ctx.fillRect(x | 0, y, 2, 1); } }
     if (!(moon && L === 0)) drawSun(...SUNPOS());
     if (IMG.panels) { ctx.save(); if (s.tilt && dust > 0) { ctx.translate(314, SKY - 32); ctx.transform(1, 0, -0.35, 1, 0, 0); ctx.translate(-314, -(SKY - 32)); }
-      const dark = 1 - Math.min(1, L); ctx.drawImage(dark > 0.05 ? shadedPanels(dark * 0.65) : IMG.panels, 250, SKY - 64); ctx.restore(); // less sun: only the panels get darker, not a box around them
+      const dark = 1 - Math.min(1, L); ctx.drawImage(dark > 0.05 ? shadedPanels(dark * 0.65) : IMG.panels, 250, SKY - 64);
+      if (!still && L > 0.5) { const gl = ((t / 2600) % 1.6) - 0.3; if (gl > 0 && gl < 1) ctx.drawImage(panelGlint(gl), 250, SKY - 64); } ctx.restore(); // sunlight glinting on the panels (only on the panels) // less sun: only the panels get darker, not a box around them
       if (!moon && s.clean < 0.9) { ctx.fillStyle = 'rgba(160,90,40,.55)'; ctx.fillRect(254, SKY - 58, 120, 30); } }
     if (!moon && IMG.reactor) ctx.drawImage(IMG.reactor, 182, SKY - 64);
     ctx.fillStyle = moon ? '#3a3d45' : '#4a2414'; ctx.fillRect(0, SKY, CW, CH - SKY);

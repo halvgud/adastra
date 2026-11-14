@@ -149,6 +149,7 @@
   //   Tapping a plant that is not ready, with no mold and no thirst, is a mistake too. 5 mistakes allowed. Fill the basket to win.
   // Mold comes more often as the basket fills. Plants keep ripening the whole time, so it can always be won.
   const GARDEN = 'assets/pixellab/garden/';
+  ['lettuce', 'sprout', 'young', 'wilt', 'mold', 'drop'].forEach(n => { new Image().src = GARDEN + n + '.png'; }); // loaded early, so the puzzle never shows empty pots
   function tend(el, o) {
     const R = o.rng, N = 12, GOAL = 12, WILT = 6500, MAXRIPE = 3, PERFECT = 1100, MAXMISS = 5, GROW = () => 1 / (11000 + R() * 7000);
     const P = Array.from({ length: N }, () => ({ g: R() * 0.45, speed: GROW(), water: 0.45 + R() * 0.55, bug: 0, ripe: 0, wilt: 0, pop: 0 }));
