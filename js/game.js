@@ -121,7 +121,7 @@
   const JOBANIM = { rest: 'sleep', tend: 'water', fix: 'repair' }; // what an astronaut does in their room
   // Inside the base nobody wears a helmet: PixelLab sprites of a woman (in-w-*) and a man (in-m-*) in the same suit, made by
   // tools/build_atlas.py into assets/pixellab/astronaut/strips/. Helmets stay on outside and in the airlock.
-  const INDOOR = ['idle', 'walk', 'water', 'repair', 'type', 'cheer', 'back'];
+  const INDOOR = ['idle', 'walk', 'water', 'repair', 'type', 'cheer', 'back', 'walkback', 'walkfront'];
   const isMan = k => k === 0 ? GENDER === 'man' : GENDER === 'man' ? k === 3 : k >= 2; // the crew is always 2 women and 2 men (setCrew)
   SPR.in = {};
   function buildIndoor() { CREW.forEach((c, k) => { const g = isMan(k) ? 'm' : 'w';
@@ -200,7 +200,9 @@
   const crewPos = CREW.map((c, k) => ({ x: 22 + k * 26, tx: 22 + k * 26, room: 3, facing: 1 }));
   let S = null, view = { mode: 'base', room: null, t0: 0 }, selected = null, FX = null, FLOAT = [], PREV = null, MOODS = {}, BANNER = null, SUMMARY = null, SUMMARY_NEXT = null;
   const SUNPOS = () => S && S.world === 'mars' ? [180, 54, 15] : [26, 96, 10];
-  function crewHome() { const n = {}; CREW.forEach((c, k) => { const j = S.jobs[k], ri = ROOMS.findIndex(r => r.id === (j ? roomFor(j) : 'shelter')); n[ri] = (n[ri] || 0) + 1;
+  // Free astronauts spread out (shelter, battery room, lab, air maker) instead of all crowding into the shelter.
+  const FREE_ROOMS = ['shelter', 'battery', 'lab', 'oxygen'];
+  function crewHome() { const n = {}; let free = 0; CREW.forEach((c, k) => { const j = S.jobs[k], want = j ? roomFor(j) : FREE_ROOMS[free++ % FREE_ROOMS.length], ri = Math.max(0, ROOMS.findIndex(r => r.id === want)); n[ri] = (n[ri] || 0) + 1;
     const p = crewPos[k]; if (p.room !== ri) { p.room = ri; p.x = (ri % 3) * RW + 6; } p.tx = p.home = (ri % 3) * RW + 22 + (n[ri] - 1) * 26; p.next = 0; }); }
   // ---------- the crew and the world move on their own ----------
   const OUTSIDE = { trip: 'samples', clean: 'panels', regolith: 'soil' }; // jobs done out on the surface
@@ -387,7 +389,11 @@
     const s = S, r = ROOMS[ri], im = IMG['room_' + r.img], [bx, by] = roomXY(ri), k = zoomK;
     const x = bx + (0 - bx) * k, y = by + (40 - by) * k, wd = RW + (384 - RW) * k, ht = RH + (240 - RH) * k;
     if (k < 1) { drawBase(t); ctx.fillStyle = `rgba(0,0,0,${k * 0.9})`; ctx.fillRect(0, 0, CW, CH); }
-    else { ctx.fillStyle = s.world === 'moon' ? '#0c1222' : '#1c0e08'; ctx.fillRect(0, 0, CW, CH); for (let i = 0; i < 40; i++) { ctx.fillStyle = '#2b3550'; ctx.fillRect((i * 97) % CW, (i * 53) % 36, 1, 1); } }
+    else { ctx.fillStyle = s.world === 'moon' ? '#0c1222' : '#1c0e08'; ctx.fillRect(0, 0, CW, CH); for (let i = 0; i < 40; i++) { ctx.fillStyle = '#2b3550'; ctx.fillRect((i * 97) % CW, (i * 53) % 36, 1, 1); }
+      // around the zoomed room: the same base, 3x bigger (soil, tunnels, ladders, the neighbour rooms), a little darker
+      ctx.save(); ctx.translate(-bx * 3, 40 - by * 3); ctx.scale(3, 3); const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;
+      drawUnderground(s.world === 'moon'); ROOMS.forEach((r2, i2) => { if (i2 === ri) return; const [x2, y2] = roomXY(i2), im2 = IMG['room_' + r2.img]; if (im2) ctx.drawImage(im2, x2, y2); });
+      ctx.imageSmoothingEnabled = sm; ctx.restore(); ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(0, 0, CW, CH); }
     if (im) ctx.drawImage(im, x, y, wd, ht);
     if (k < 1) return;
     const C = roomCtx(ri);
@@ -409,13 +415,21 @@
       const indoor = r.id !== 'airlock', fr = spr(kk, 'idle', indoor), jt = t - (JUMP[kk] || -9999), cheer = !still && actFrame(kk, 'cheer', t, indoor);
       const hop = !cheer && jt < 500 && !still ? Math.sin(jt / 500 * Math.PI) * 26 : 0; // tapped: a happy jump (or a little hop)
       if (!cheer && S.jobs[kk] === 'lab' && spr(kk, 'back', true).length) { atComputer(t, kk, hop); return; }
-      if (!cheer && !still && S.jobs[kk] === 'tend' && indoor) { // walk along the trays, stop at each one and water it
-        const P = 3600, st = [128, 206, 284], n = Math.floor(t / P) + kk, ph = (t % P) / P, a = st[(n + 2) % 3], b = st[n % 3], walk = ph < 0.35, x = walk ? a + (b - a) * (ph / 0.35) : b;
-        const wk = spr(kk, 'walk', true), wt = spr(kk, 'water', true), f = walk ? wk[Math.floor(t / 110) % (wk.length || 1)] : wt[Math.min(wt.length - 1, Math.floor((ph - 0.35) * P / 140) % (wt.length || 1))];
-        if (f) drawSprite(f, x, 274 - hop, walk ? Math.sign(b - a) || 1 : 1, 2); return; }
+      if (!cheer && S.jobs[kk] === 'tend' && indoor) { gardener(t, kk, hop); return; } // down the aisle, watering both sides
       const busy = !still && JOBANIM[S.jobs[kk]] && actFrame(kk, JOBANIM[S.jobs[kk]], t, indoor);
       const f = cheer || busy || (fr.length ? fr[Math.floor(t / 260) % fr.length] : null); if (f) drawSprite(f, 70 + i * 90, 274 - hop, 1, 2); });
   }
+  // Gardening in the zoomed greenhouse (a picture with a middle aisle, seen from the door): walk away down the aisle, stop and
+  // water the bed on the right, then the left, go further, water again, and walk back toward you. Smaller when further away.
+  const AISLE = [[0, 'back', 0, 0.45], [2400, 'water', 0.45, 0.45, 1], [3700, 'water', 0.45, 0.45, -1], [5000, 'back', 0.45, 0.85],
+    [6500, 'water', 0.85, 0.85, 1], [7700, 'water', 0.85, 0.85, -1], [8900, 'front', 0.85, 0], [11900]]; // [start ms, what, depth from, depth to, facing]
+  function gardener(t, kk, hop) {
+    const P = AISLE[AISLE.length - 1][0], tt = still ? 2500 : (t + kk * 1700) % P; let i = 0; while (i < AISLE.length - 2 && tt >= AISLE[i + 1][0]) i++;
+    const [t0, what, d0, d1, face] = AISLE[i], t1 = AISLE[i + 1][0], k = (tt - t0) / (t1 - t0), d = d0 + (d1 - d0) * k;
+    const sc = 2 - 0.95 * d, foot = 280 - 78 * d, x = 192;
+    const frames = what === 'back' ? spr(kk, 'walkback', true) : what === 'front' ? spr(kk, 'walkfront', true) : spr(kk, 'water', true);
+    const f = frames.length ? (what === 'water' ? frames[Math.min(frames.length - 1, Math.floor((tt - t0) / 140))] : frames[Math.floor(t / 120) % frames.length]) : null;
+    if (f) drawSprite(f, x, foot - hop, what === 'water' ? face : 1, sc); }
   // Lab work: the astronaut stands at the big computer, seen from behind, typing. The screen scrolls data and keys flash.
   const PC = { x: 182, foot: 272, scr: [152, 124, 60, 40], keysY: 196 }; // where the astronaut stands, the main screen (x, y, w, h) and the keyboard row, in the zoomed lab
   function atComputer(t, kk, hop) {
