@@ -175,19 +175,31 @@
   // come in from the bottom right). (gx, gy) = the middle of the glove; holding(x, y) draws what the hand carries, behind
   // the fist. If the pictures are not loaded (yet), armCode draws a simpler arm with code.
   const ARM = { open: new Image(), grip: new Image(), ax: 42, ay: 42, s: 0.72 };
-  ARM.open.src = 'assets/pixellab/fp/arm-open.png'; ARM.grip.src = 'assets/pixellab/fp/arm-grip.png';
+  ARM.open.src = 'assets/pixellab/fp/arm-open.png'; ARM.grip.src = 'assets/pixellab/fp/arm-grip-r.png'; // the right fist, turned (not mirrored) so the arm comes from the bottom right with the thumb on the inside
+  // The arm pictures end at their square edge. Behind each one, the sleeve goes on in the same direction until it leaves the
+  // screen, so a raised hand never shows the picture's pointed corner. Per picture: a point on the sleeve's upper edge, its
+  // slope, and where its lower edge meets the picture's bottom.
+  const SLEEVE = { open: [100, 71, 1.05, 107], grip: [100, 60, 0.8, 91] };
+  function armImg(g, im, k) { const [tx, ty, m, bx] = SLEEVE[k], L = 700; g.save(); g.translate(-ARM.ax, -ARM.ay);
+    g.fillStyle = '#e4ecef'; g.beginPath(); g.moveTo(tx, ty); g.lineTo(tx + L, ty + L * m); g.lineTo(bx + L, 128 + L * m); g.lineTo(bx, 128); g.fill();
+    g.fillStyle = '#aab6c0'; g.beginPath(); g.moveTo(tx, ty); g.lineTo(tx + L, ty + L * m); g.lineTo(tx + L, ty + L * m + 10); g.lineTo(tx, ty + 10); g.fill(); // its shaded top side
+    const n = Math.hypot(1, m), wd = Math.abs((bx - tx) * m - (128 - ty)) / n; // the sleeve's width
+    g.strokeStyle = '#c2ccd6'; g.lineWidth = 3; for (let d = 40; d < L; d += 26) { const x0 = tx + d, y0 = ty + d * m, px = -m / n, py = 1 / n; // folds across the cloth
+      g.beginPath(); g.moveTo(x0 + px * 8, y0 + py * 8); g.quadraticCurveTo(x0 + px * wd * 0.5 + 6, y0 + py * wd * 0.5 - 4, x0 + px * (wd - 4), y0 + py * (wd - 4)); g.stroke(); }
+    g.fillStyle = '#b9c3cd'; g.beginPath(); g.moveTo(bx, 128); g.lineTo(bx + L, 128 + L * m); g.lineTo(bx + L - 8 * m, 128 + L * m - 8); g.lineTo(bx - 8 * m, 128 - 8); g.fill(); // shade on the lower side
+    g.drawImage(im, 0, 0); g.restore(); }
   function arm(g, gx, gy, holding, tool, cap) {
     const grip = !!(holding || tool), im = grip ? ARM.grip : ARM.open; if (!im.complete || !im.naturalWidth) return armCode(g, gx, gy, holding, tool);
     const s = Math.min(cap || 1.0, Math.max(ARM.s, (H + 8 - gy) / (124 - ARM.ay))); // bigger when the hand is high, so the sleeve still reaches the bottom edge
     if (tool) tool(gx, gy);                                                    // a tool's handle goes behind the fist
     if (holding) holding(gx - 16 * s, gy - 12 * s);                            // so does what you carry: it sticks out past the fingers (up and left)
     g.save(); g.imageSmoothingEnabled = false; g.translate(gx, gy);
-    if (grip) { g.scale(-s, s); g.drawImage(im, -(128 - ARM.ax), -ARM.ay); } else { g.scale(s, s); g.drawImage(im, -ARM.ax, -ARM.ay); }
+    g.scale(s, s); armImg(g, im, grip ? 'grip' : 'open');
     g.restore();
   }
   // A second hand: the left glove (closed), coming in from the bottom left, e.g. lower down a shovel's handle.
   function leftHand(g, gx, gy, s) { const im = ARM.grip; if (!im.complete || !im.naturalWidth) return;
-    g.save(); g.imageSmoothingEnabled = false; g.translate(gx, gy); g.scale(s, s); g.drawImage(im, -(128 - ARM.ax), -ARM.ay); g.restore(); }
+    g.save(); g.imageSmoothingEnabled = false; g.translate(gx, gy); g.scale(-s, s); armImg(g, im, 'grip'); g.restore(); } // the mirror of the right fist
   function armCode(g, gx, gy, holding, tool) {
     const bx = gx + 30, by = H + 18, wx = gx + 2, wy = gy + 8, dx = wx - bx, dy = wy - by, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
     const at = (k, w) => [bx + dx * k + nx * w, by + dy * k + ny * w], poly = pts => { g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.fill(); };
