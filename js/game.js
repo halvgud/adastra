@@ -314,6 +314,18 @@
     const hx = 36; if (sh) ctx.drawImage(sh, hx - 10, SKY - 8, 20, 26); // from the surface hatch down to the airlock
     if (IMG.base_hatch) ctx.drawImage(IMG.base_hatch, hx - 33, SKY - 42, 66, 44); // the way out: about as big as a solar panel
     ctx.imageSmoothingEnabled = sm; }
+  // A ladder through a hatch in the floor: from the upper room down to the lower room's floor (rails, rungs, the dark hatch).
+  function drawLadders() { LADDERS.forEach(lx => { const top = SKY + RH - 34, bot = SKY + 2 * RH - FLOOR, hy = SKY + RH;
+    ctx.fillStyle = '#1b1d26'; ctx.fillRect(lx - 9, hy - 4, 18, 8);                                   // the hatch opening in the floor
+    ctx.fillStyle = '#4b5263'; ctx.fillRect(lx - 9, hy - 5, 18, 1); ctx.fillRect(lx - 9, hy + 4, 18, 1);
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(lx - 5, top + 2, 12, bot - top);                 // its shadow on the wall
+    ctx.fillStyle = '#9aa3b5'; ctx.fillRect(lx - 7, top, 2, bot - top); ctx.fillRect(lx + 5, top, 2, bot - top); // rails
+    ctx.fillStyle = '#7d8696'; for (let y = top + 3; y < bot; y += 5) ctx.fillRect(lx - 5, y, 10, 1); }); } // rungs
+  // Door frames in front: the edges of neighbouring rooms are drawn again over the crew, so someone walking from one room
+  // to the next goes through the doorway (behind the wall) instead of over the dividing wall.
+  function drawDoorFronts() { for (let row = 0; row < 2; row++) for (let col = 1; col < 3; col++) {
+    const L = cellImg(ROOMS[row * 3 + col - 1]), R = cellImg(ROOMS[row * 3 + col]), x = col * RW, y = SKY + row * RH, e = 7;
+    if (L && L.width === RW) ctx.drawImage(L, RW - e, 0, e, RH, x - e, y, e, RH); if (R && R.width === RW) ctx.drawImage(R, 0, 0, e, RH, x, y, e, RH); } }
   let SMALLTINT = null;
   function smallTint(im, x, y, color) { if (!im) return; if (!SMALLTINT) SMALLTINT = document.createElement('canvas');
     if (SMALLTINT.width !== im.width || SMALLTINT.height !== im.height) { SMALLTINT.width = im.width; SMALLTINT.height = im.height; }
@@ -336,7 +348,7 @@
     if (!moon && IMG.reactor) ctx.drawImage(IMG.reactor, 182, SKY - 64);
     drawUnderground(moon);
     ROOMS.forEach((r, i) => { const [x, y] = roomXY(i), im = cellImg(r); if (im) ctx.drawImage(im, x, y); // cells: one connected building (its own look on Mars)
-      if (i === 5 && IMG.cell_lab && IMG.base_shaft) { const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false; [RW + 22, 2 * RW + 22].forEach(lx => ctx.drawImage(IMG.base_shaft, lx - 7, SKY + RH - 12, 14, 24)); ctx.imageSmoothingEnabled = sm; } // ladder hatches between the two floors
+      if (i === 5 && IMG.cell_lab) drawLadders(); // ladders between the two floors, part of the building (drawn before the crew)
       if (isOn(r) === false) smallTint(im, x, y, 'rgba(0,0,0,.6)'); // lights off: darken the room picture only
       if (r.id === 'battery') { const k = Math.max(0, s.batt) / s.cap; ctx.fillStyle = '#000'; ctx.fillRect(x + 108, y + 18, 12, 50);
         ctx.fillStyle = k < .25 ? '#D55E00' : k < .5 ? '#E69F00' : '#009E73'; const h = r0(48 * k); ctx.fillRect(x + 109, y + 19 + 48 - h, 10, h); }
@@ -380,6 +392,7 @@
       if (k === 0) text('★', p.x, ry + 16 - hop, '#ff9a3c', 9); if (selected === k) { ctx.fillStyle = '#F0E442'; ctx.fillRect(p.x - 3, ry + 4, 6, 6); }
       if (live) { const by = ry + 2 - hop; ctx.fillStyle = '#fff'; ctx.fillRect(p.x - 9, by - 13, 18, 15); ctx.fillRect(p.x - 2, by + 2, 4, 3); ctx.fillStyle = '#000'; ctx.fillRect(p.x - 9, by - 13, 18, 1);
         ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; if (window.JAMT_ICON && JAMT_ICON.hasIcon(md.e)) JAMT_ICON.draw(ctx, md.e, p.x, by - 1, 10, () => {}); else ctx.fillText(md.e, p.x, by - 2); ctx.textAlign = 'left'; } });
+    if (IMG.cell_lab) drawDoorFronts(); // doorways in front of whoever walks through them
   }
   // Animations inside a zoomed room (the room art fills x 0–384, y 40–280). Skipped when the player prefers reduced motion.
   // Colour the zoomed room picture itself (grow-light pink, lights-off dark) instead of a rectangle that spills outside it.
