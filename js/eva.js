@@ -33,7 +33,7 @@
   const FXI = {}, fx = n => { if (!FXI[n]) { FXI[n] = new Image(); FXI[n].src = n.includes('/') ? n : 'assets/pixellab/fx/' + n + '.png'; } return FXI[n]; };
   const ready = im => !!(im && im.complete && im.naturalWidth);
   ['rock-moon-0', 'rock-moon-1', 'rock-moon-2', 'rock-mars-0', 'rock-mars-1', 'rock-mars-2', 'sample', 'hills-moon', 'hills-mars', 'ground-moon', 'ground-mars',
-    'assets/pixellab/props/solar-panels.png', 'assets/pixellab/mg/solar.png', 'assets/pixellab/mg/dust.png', 'assets/pixellab/mg/sandbag.png', 'assets/pixellab/garden/lettuce.png', 'habitat', 'antenna', 'lander', 'mound-moon', 'mound-mars', 'dig-moon', 'dig-mars', 'corr-wall', 'corr-floor', 'corr-ceil', 'corr-door', 'microscope',
+    'assets/pixellab/props/solar-panels.png', 'assets/pixellab/mg/solar.png', 'assets/pixellab/mg/dust.png', 'assets/pixellab/mg/sandbag.png', 'assets/pixellab/garden/lettuce.png', 'habitat', 'antenna', 'lander', 'assets/pixellab/mg/valve.png', 'assets/pixellab/mg/bin.png', 'assets/pixellab/mg/rock-basalt.png', 'assets/pixellab/mg/rock-bright.png', 'assets/pixellab/mg/rock-ice.png', 'mound-moon', 'mound-mars', 'dig-moon', 'dig-mars', 'corr-wall', 'corr-floor', 'corr-ceil', 'corr-door', 'microscope',
     'assets/pixellab/rooms/lab.png', 'assets/pixellab/rooms/oxygen.png', 'assets/pixellab/rooms/greenhouse.png',
     'assets/pixellab/rooms/lab-mars.png', 'assets/pixellab/rooms/oxygen-mars.png', 'assets/pixellab/rooms/greenhouse-mars.png',
     'assets/pixellab/rooms/lab-moon.png', 'assets/pixellab/rooms/oxygen-moon.png', 'assets/pixellab/rooms/greenhouse-moon.png'].forEach(fx);
@@ -353,6 +353,49 @@
         g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1; g.beginPath(); g.moveTo(W / 2 - 50, H / 2); g.lineTo(W / 2 + 50, H / 2); g.moveTo(W / 2, H / 2 - 50); g.lineTo(W / 2, H / 2 + 50); g.stroke();
         g.fillStyle = '#7fffd4'; g.font = '7px ui-monospace, Consolas, monospace'; g.textAlign = 'left'; g.fillText('x400', 6, H - 6); } },
 
+    // Valve sequence (air maker): three valve wheels on the air pipe; your glove turns them one after another, each light
+    // goes green, and bubbles of fresh air start rising in the glass column.
+    valves: { outside: false, banner: 'VALVES OPEN! FRESH AIR', at: 8100, theme: { wall: [175, 180, 190], ceil: [80, 86, 96], floor: [100, 106, 116], stripe: [0, 158, 115], glow: [200, 240, 255] },
+      close(g, t, X) {
+        g.fillStyle = '#4b5263'; g.fillRect(0, 0, W, H); g.fillStyle = '#596173'; for (let i = 0; i < 6; i++) g.fillRect(i * 34, 0, 2, H);
+        g.fillStyle = '#9aa3b5'; g.fillRect(0, 76, 170, 16); g.fillStyle = '#c9d0de'; g.fillRect(0, 78, 170, 3); g.fillStyle = '#6d7587'; g.fillRect(0, 89, 170, 3); // the air pipe
+        const V = fx('assets/pixellab/mg/valve.png'), WX = [36, 84, 132], HUE = [0, 135, 200], T0 = 5600, STEP = 760;
+        const cur = Math.max(0, Math.min(2, Math.floor((t - T0) / STEP))), turning = t > T0 && t < T0 + 3 * STEP;
+        if (turning && cur !== X.vcur) { X.vcur = cur; X.sound('clink'); }
+        let grip = null;
+        WX.forEach((wx, i) => { const done = t > T0 + (i + 1) * STEP, now = turning && i === cur, k = now ? seg(t, T0 + i * STEP, T0 + (i + 1) * STEP) : done ? 1 : 0, rot = ease(k) * Math.PI;
+          g.fillStyle = '#1b1d26'; g.fillRect(wx - 3, 68, 6, 10); // the stem into the pipe
+          g.save(); g.translate(wx, 52); g.rotate(rot); g.imageSmoothingEnabled = false;
+          if (ready(V)) { g.filter = `hue-rotate(${HUE[i]}deg) brightness(${done || now ? 1.1 : 0.7})`; g.drawImage(V, -19, -19, 38, 38); g.filter = 'none'; }
+          else { g.strokeStyle = '#d55e00'; g.lineWidth = 4; g.beginPath(); g.arc(0, 0, 15, 0, 6.283); g.stroke(); }
+          g.restore();
+          g.fillStyle = done ? '#3ddc97' : '#7a1f1f'; g.fillRect(wx - 4, 22, 8, 5); if (done) { g.fillStyle = 'rgba(61,220,151,.35)'; g.fillRect(wx - 7, 19, 14, 11); } // its light
+          if (now) grip = [wx + Math.cos(rot + 0.6) * 16, 52 + Math.sin(rot + 0.6) * 16]; });
+        // the glass column on the right: dark at first, then bubbles of fresh air
+        g.fillStyle = '#0b2a40'; g.fillRect(172, 14, 16, 92); g.fillStyle = '#c9d0de'; g.fillRect(170, 12, 20, 3); g.fillRect(170, 105, 20, 3);
+        if (t > T0 + 3 * STEP) { const a = seg(t, T0 + 3 * STEP, T0 + 3 * STEP + 600); g.fillStyle = `rgba(86,180,233,${0.5 * a})`; g.fillRect(172, 14, 16, 92);
+          for (let i = 0; i < 10; i++) { const ph = ((t / 900) + i / 10) % 1; g.fillStyle = `rgba(220,245,255,${a * (1 - ph * 0.6)})`; g.fillRect(174 + (i * 5) % 12, 102 - ph * 86, 2, 2); } }
+        if (grip) arm(g, grip[0] + 4, grip[1] + 6, null, () => {}, 0.55); // a closed glove on the turning wheel
+        else if (t > T0 + 3 * STEP) arm(g, 120 + Math.min(1, (t - T0 - 3 * STEP) / 500) * 30, 118, null, null, 0.55); // the glove moves away
+        if (t > T0 + 3 * STEP) sparkle(g, 180, 30, t, 4); } },
+
+    // Rock sorter (lab): three sample crates on the bench; your glove drops a dark lava rock, a bright highland rock and a
+    // piece of ice, each into its own crate.
+    sort: { outside: false, banner: 'SAMPLES SORTED! +1 ★', at: 8200, theme: { wall: [150, 160, 185], ceil: [70, 78, 98], floor: [92, 100, 120], stripe: [86, 180, 233], glow: [120, 220, 255] },
+      close(g, t, X) {
+        g.fillStyle = '#2b3042'; g.fillRect(0, 0, W, H); g.fillStyle = '#353b50'; for (let i = 0; i < 8; i++) g.fillRect(i * 26, 0, 1, 70); // lab wall
+        g.fillStyle = '#5c6378'; g.fillRect(0, 86, W, 5); g.fillStyle = '#3a4050'; g.fillRect(0, 91, W, H - 91); // the bench
+        const BIN = fx('assets/pixellab/mg/bin.png'), ROCK = ['basalt', 'bright', 'ice'].map(n => fx('assets/pixellab/mg/rock-' + n + '.png')), CX = [40, 96, 152], T0 = 5500, STEP = 850;
+        g.imageSmoothingEnabled = false;
+        CX.forEach((cx, i) => { if (ready(BIN)) g.drawImage(BIN, cx - 26, 52, 52, 39); else { g.fillStyle = '#6d7587'; g.fillRect(cx - 24, 60, 48, 28); }
+          if (ready(ROCK[i])) { g.globalAlpha = 0.9; g.drawImage(ROCK[i], cx - 8, 30, 16, 16); g.globalAlpha = 1; } // the label above each crate
+          if (t > T0 + (i + 1) * STEP - 120 && ready(ROCK[i])) { g.drawImage(ROCK[i], cx - 9, 46, 18, 18); if (t < T0 + (i + 1) * STEP + 500) sparkle(g, cx + 8, 46, t, 4); } });
+        const i = Math.floor((t - T0) / STEP);
+        if (t > T0 - 400 && i < 3) { const ii = Math.max(0, i), k = ease(seg(t, T0 + ii * STEP, T0 + ii * STEP + STEP - 150)), sx = 96, sy = 18, tx = CX[ii], ty = 52;
+          if (i >= 0 && t - T0 - ii * STEP < 40 && X.rdrop !== ii) { X.rdrop = ii; X.sound('pop'); }
+          const gx = sx + (tx - sx) * k, gy = sy + (ty - sy) * k - Math.sin(k * 3.14) * 14;
+          arm(g, gx + 8, gy + 18, (x, y) => { if (ready(ROCK[ii])) g.drawImage(ROCK[ii], x - 9, y - 9, 18, 18); }, null, 0.55); }
+        else if (i >= 3) arm(g, 96, 130 - Math.min(1, (t - T0 - 3 * STEP) / 400) * 8, null, null, 0.55); } },
     fix: { outside: false, banner: 'FIXED! WATER SAVED', at: 8100, theme: { wall: [175, 180, 190], ceil: [80, 86, 96], floor: [100, 106, 116], stripe: [0, 158, 115], glow: [200, 240, 255] },
       close(g, t, X) { // a leaking pipe; the wrench turns the nut, the leak stops, water flows and the gauge goes green
         g.fillStyle = '#4b5263'; g.fillRect(0, 0, W, H); g.fillStyle = '#596173'; for (let i = 0; i < 6; i++) g.fillRect(i * 34, 0, 2, H);
@@ -424,7 +467,7 @@
 
   function play(host, opt, done) {
     DOORWORLD.mars = opt.world === 'mars';
-    const S = SCENES[opt.job] || SCENES.trip, moon = opt.world !== 'mars', still = !!opt.still, fixed = opt.at != null, sound = opt.sound || (() => {});
+    const S = SCENES[opt.game] || SCENES[opt.job] || SCENES.trip, moon = opt.world !== 'mars', still = !!opt.still, fixed = opt.at != null, sound = opt.sound || (() => {});
     host.innerHTML = `<div class="eva"><canvas width="${W}" height="${H}" aria-label="A short animation of the job you just finished"></canvas><button class="evaskip" type="button">Skip ⏭</button></div>`;
     const cv = host.querySelector('canvas'), g = cv.getContext('2d'), img = g.createImageData(W, H);
     const X = { moon, outside: S.outside, still, sound: k => { if (!fixed && !still) sound(k); }, st: S.init ? S.init(moon, opt) : null };

@@ -603,7 +603,7 @@
         const team = S.jobs.map((jj, k) => jj === j ? k : -1).filter(k => k >= 0), buddy = team.find(k => k !== 0);
         const head = { trip: '🚀 Out on the surface…', clean: '🧽 Out to the solar panels…', regolith: '🛡️ Out to the shelter wall…', lab: '🔬 To the lab…', fix: '🔧 To the air maker…', tend: '🌱 To the greenhouse…' }[j];
         popup(`<h2>${head}</h2><div id="evahost"></div>`); $('popcard').classList.add('mgcard');
-        JAMT_EVA.play($('evahost'), { job: j, world: S.world, noai: NOAI, banner: j === 'fix' && !S.broken ? `ALL CHECKED! +${MGR.stars} ★` : null, partner: j === 'trip' ? SPR.back[buddy != null ? buddy : 1] || null : null,
+        JAMT_EVA.play($('evahost'), { job: j, game: g, world: S.world, noai: NOAI, banner: g === 'fix' && !S.broken ? `ALL CHECKED! +${MGR.stars} ★` : null, partner: j === 'trip' ? SPR.back[buddy != null ? buddy : 1] || null : null,
           sound: k => k === 'door' ? beep([[220, .25], [180, .3]], 'sawtooth', .025) : k === 'clink' ? beep([[1400, .03], [900, .04]], 'square', .03) : k === 'pop' ? beep([[300, .04], [600, .06]], 'triangle', .05) : beep([[90, .05]], 'triangle', .05) }, () => show());
         return; }
       show();
