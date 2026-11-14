@@ -33,7 +33,7 @@
   const FXI = {}, fx = n => { if (!FXI[n]) { FXI[n] = new Image(); FXI[n].src = n.includes('/') ? n : 'assets/pixellab/fx/' + n + '.png'; } return FXI[n]; };
   const ready = im => !!(im && im.complete && im.naturalWidth);
   ['rock-moon-0', 'rock-moon-1', 'rock-moon-2', 'rock-mars-0', 'rock-mars-1', 'rock-mars-2', 'sample', 'hills-moon', 'hills-mars', 'ground-moon', 'ground-mars',
-    'assets/pixellab/props/solar-panels.png', 'assets/pixellab/mg/solar.png', 'assets/pixellab/mg/dust.png', 'assets/pixellab/mg/sandbag.png', 'assets/pixellab/garden/lettuce.png'].forEach(fx);
+    'assets/pixellab/props/solar-panels.png', 'assets/pixellab/mg/solar.png', 'assets/pixellab/mg/dust.png', 'assets/pixellab/mg/sandbag.png', 'assets/pixellab/garden/lettuce.png', 'habitat', 'antenna', 'lander'].forEach(fx);
   const PIX = {}; function pixelsOf(n) { // the RGBA of a picture, read once
     if (PIX[n] !== undefined) return PIX[n]; const im = fx(n); if (!ready(im)) return null;
     try { const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const g = c.getContext('2d'); g.drawImage(im, 0, 0); PIX[n] = { w: im.width, h: im.height, d: g.getImageData(0, 0, im.width, im.height).data }; } catch (e) { PIX[n] = false; } return PIX[n]; }
@@ -49,7 +49,8 @@
   function outsideWorld(moon, path, clear) { // path(s) = x of the walking line at distance s; clear = keep rocks this far off it
     const rnd = mkRnd(moon ? 99 : 131), rocks = [];
     for (let i = 0; i < 60; i++) { const y = -2 + rnd() * 34, x = (rnd() - 0.5) * 18; if (Math.abs(x - path(y)) < (clear || 1.1)) continue; rocks.push({ x, y, r: 0.15 + rnd() * 0.45, k: 'rock', v: i % 3 }); }
-    return { moon, tex: makeTex(moon ? 7 : 11), rocks, stars: Array.from({ length: 70 }, () => ({ a: rnd() * 6.283, y: rnd() * 44, b: rnd() })),
+    const props = [{ k: 'prop', im: 'habitat', x: -7.5, y: 16, wu: 6 }, { k: 'prop', im: 'antenna', x: 6.5, y: 20, wu: 1.6 }, { k: 'prop', im: 'lander', x: -9, y: 30, wu: 4 }];
+    return { moon, tex: makeTex(moon ? 7 : 11), rocks, props, stars: Array.from({ length: 70 }, () => ({ a: rnd() * 6.283, y: rnd() * 44, b: rnd() })),
       ground: moon ? [150, 150, 156] : [178, 98, 58], fogC: moon ? [8, 8, 14] : [214, 160, 118], fogD: moon ? 40 : 22,
       skyTop: moon ? [2, 2, 8] : [196, 128, 92], skyLow: moon ? [10, 10, 22] : [232, 186, 140] };
   }
@@ -75,7 +76,7 @@
     const HL = hillsOf(E.moon ? 'hills-moon' : 'hills-mars');
     if (HL) { const sh = 26, sw = HL.width * sh / HL.height, off = (((-c.a * 150) % sw) + sw) % sw; g.imageSmoothingEnabled = false; for (let x = -off - sw; x < W; x += sw) g.drawImage(HL, x, c.hy - sh + 3, sw, sh); }
     else for (let x = 0; x < W; x++) { const h = ridge(c.a + Math.atan((x - W / 2) / F)); g.fillStyle = E.moon ? '#3a3a44' : '#a8603e'; g.fillRect(x, c.hy - h, 1, h + 1); }
-    const items = E.rocks.concat(extra), seen = {};
+    const items = E.rocks.concat(E.props || [], extra), seen = {};
     items.forEach(o => { const rx = o.x - c.x, ry = o.y - c.y; o.d = rx * sa + ry * ca; o.l = rx * ca - ry * sa; });
     items.filter(o => o.d > 0.35).sort((p, q) => q.d - p.d).forEach(o => {
       const sx = W / 2 + o.l / o.d * F, gy = c.hy + CAM * F / o.d, u = F / o.d, fog = Math.min(1, o.d / E.fogD);
@@ -93,6 +94,10 @@
         g.fillStyle = rgb(base, 1.05, fog, E.fogC); g.beginPath(); g.ellipse(sx - w * 0.12, gy - h * 0.62, w * 0.3, h * 0.3, 0, 0, 6.283); g.fill();
         if (o.k === 'sample') { const tw = 0.5 + 0.5 * Math.sin(t / 120), sz = Math.max(1, u * 0.06); g.fillStyle = `rgba(240,228,66,${0.5 + 0.5 * tw})`;
           g.fillRect(sx - sz / 2, gy - h - sz * 3, sz, sz * 2); g.fillRect(sx - sz * 1.5, gy - h - sz * 2.5, sz * 3, sz); } }
+      if (o.k === 'prop') { const pi = fx(o.im); if (!ready(pi)) return; const w = o.wu * u, h = w * pi.height / pi.width; // a landmark of the base (PixelLab)
+        g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(sx - w * 0.45, gy - 1, w * 0.9, Math.max(1, h * 0.06)); g.imageSmoothingEnabled = false; g.globalAlpha = 1 - fog * 0.8;
+        g.drawImage(pi, sx - w / 2, gy - h * 0.97, w, h); g.globalAlpha = 1;
+        if (o.im === 'antenna' && Math.floor(t / 500) % 2) { g.fillStyle = '#ff3b30'; g.fillRect(sx + w * 0.06, gy - h * 0.9, Math.max(1, u * 0.12), Math.max(1, u * 0.12)); } return; }
       if (o.k === 'buddy') { const hgt = 1.8 * u, sw = hgt * 68 / 46, bob = c.walking ? (E.moon ? Math.abs(Math.sin(t / 420 + 1)) * u * 0.25 : Math.abs(Math.sin(t / 190)) * u * 0.05) : 0;
         g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(sx - hgt * 0.2, gy - 1, hgt * 0.4, Math.max(1, hgt * 0.05));
         g.imageSmoothingEnabled = false; g.drawImage(o.img, sx - sw / 2, gy - bob - sw * 56 / 68, sw, sw); }

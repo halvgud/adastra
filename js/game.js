@@ -149,7 +149,7 @@
     g.putImageData(d, 0, 0); return c;
   }
   async function loadArt() {
-    const jobs = [load('bg_moon', ART + 'bg/moon.png'), load('bg_mars', ART + 'bg/mars.png'), load('panels', ART + 'props/solar-panels.png'), load('reactor', ART + 'props/reactor.png'), load('rover', ART + 'props/rover.png'), load('south', ART + 'astronaut/Idle/rotations/south.png'), load('north', ART + 'astronaut/Idle/rotations/north.png')];
+    const jobs = [load('bg_moon', ART + 'bg/moon.png'), load('bg_mars', ART + 'bg/mars.png'), load('panels', ART + 'props/solar-panels.png'), load('reactor', ART + 'props/reactor.png'), load('rover', ART + 'props/rover.png'), ...['soil-moon', 'soil-mars', 'tunnel', 'shaft', 'hatch'].map(n => load('base_' + n, ART + 'base/' + n + '.png')), load('south', ART + 'astronaut/Idle/rotations/south.png'), load('north', ART + 'astronaut/Idle/rotations/north.png')];
     ROOMS.forEach(r => jobs.push(load('room_' + r.img, ART + 'rooms/' + r.img + '.png')));
     Object.keys(MISSIONS).forEach(k => jobs.push(load('patch_' + k, patchSrc(k))));
     // Each animation is one strip of frames side by side (assets/pixellab/astronaut/strips/, made by tools/build_atlas.py)
@@ -239,12 +239,12 @@
     if (IMG.rover) { const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false; ctx.drawImage(IMG.rover, x | 0, y | 0, w, h); ctx.imageSmoothingEnabled = sm; } }
   const isOn = r => r.sw ? (r.sw === 'lab' ? S.sw.lab && !S.sw.save : S.sw[r.sw]) : null;
   function disc(x, y, r, fill) { ctx.fillStyle = fill; for (let yy = -r; yy <= r; yy++) for (let xx = -r; xx <= r; xx++) if (xx * xx + yy * yy <= r * r + r) ctx.fillRect(x + xx, y + yy, 1, 1); }
+  // A plain sun in the sky (no face: it confused players). Tapping it still shows the real Sun from NASA DONKI,
+  // which only sets the size of the solar storms in the two storm missions.
   function drawSun(x, y, r) {
-    disc(x, y, r, sunWord === 'STORMY' ? '#D55E00' : sunWord === 'ACTIVE' ? '#E69F00' : '#F0E442');
-    ctx.fillStyle = '#000'; ctx.fillRect(x - 4, y - 3, 2, 3); ctx.fillRect(x + 3, y - 3, 2, 3);
-    if (sunWord === 'QUIET') { ctx.fillRect(x - 4, y + 3, 1, 1); ctx.fillRect(x - 3, y + 4, 7, 1); ctx.fillRect(x + 4, y + 3, 1, 1); }
-    else if (sunWord === 'ACTIVE') ctx.fillRect(x - 3, y + 4, 7, 1);
-    else { ctx.fillRect(x - 5, y - 5, 3, 1); ctx.fillRect(x + 3, y - 5, 3, 1); ctx.fillRect(x - 3, y + 4, 7, 1); ctx.fillRect(x - 3, y + 3, 1, 1); ctx.fillRect(x + 3, y + 3, 1, 1); }
+    ctx.fillStyle = 'rgba(255,240,180,.18)'; ctx.beginPath(); ctx.arc(x, y, r + 6, 0, 6.283); ctx.fill();
+    ctx.fillStyle = 'rgba(255,240,180,.28)'; ctx.beginPath(); ctx.arc(x, y, r + 3, 0, 6.283); ctx.fill();
+    disc(x, y, r, '#fff1b8'); disc(x - r * 0.25, y - r * 0.25, r * 0.55, '#fffbe6');
   }
   // Frames are 68 px (idle, walk) or 76 px (the action animations: the same astronaut with room to move); feet sit 8 px
   // above the bottom of a 68 px frame, and the bigger canvas adds the same margin on every side.
@@ -277,6 +277,27 @@
     ctx.fillStyle = bag ? '#3b74b0' : '#7a5aa8'; ctx.fillRect(x - 30 * s, y - 8 * s - br, 36 * s, 16 * s);            // blanket up to the chest
     ctx.fillStyle = bag ? '#5c97d6' : '#9677c4'; ctx.fillRect(x - 30 * s, y - 8 * s - br, 36 * s, 3 * s); ctx.fillRect(x - 6 * s, y - 8 * s - br, 3 * s, 16 * s);
     if (!still) { const zph = (t / 1600 + k * 0.3) % 1; ctx.globalAlpha = 1 - zph; text('z', x + 20 * s + zph * 14 * s, y - 14 * s - zph * 30 * s, '#cfe3ff', Math.max(8, (9 + zph * 6) * s * 1.6)); ctx.globalAlpha = 1; } }
+  // The rooms are one base dug into the ground, seen as a cut-away from the side: soil around them, pressurised tunnels
+  // between neighbours, ladder shafts between the two floors, and a hatch on the surface above the airlock.
+  // Drawn before the rooms, so each tunnel's ends disappear into the rooms. Pieces: assets/pixellab/base/ (PixelLab).
+  function drawUnderground(moon) {
+    const soil = IMG[moon ? 'base_soil-moon' : 'base_soil-mars'];
+    if (soil) { ctx.save(); ctx.fillStyle = ctx.createPattern(soil, 'repeat'); ctx.translate(0, SKY); ctx.fillRect(0, 0, CW, CH - SKY); ctx.restore(); ctx.fillStyle = 'rgba(0,0,0,.38)'; ctx.fillRect(0, SKY, CW, CH - SKY); }
+    else { ctx.fillStyle = moon ? '#3a3d45' : '#4a2414'; ctx.fillRect(0, SKY, CW, CH - SKY); }
+    ctx.fillStyle = moon ? '#6c6f78' : '#8a3a22'; ctx.fillRect(0, SKY, CW, 2); // the surface edge
+    const tun = IMG.base_tunnel, sh = IMG.base_shaft, sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;
+    for (let row = 0; row < 2; row++) for (let col = 1; col < 3; col++) { const x = col * RW, y = SKY + row * RH + RH - 30; // side tunnels
+      if (tun) ctx.drawImage(tun, x - 26, y, 52, 26); else { ctx.fillStyle = '#9aa0ab'; ctx.fillRect(x - 24, y + 8, 48, 10); } }
+    [[0, 96], [2, 34]].forEach(([col, dx]) => { const x = col * RW + dx, y = SKY + RH - 22; // ladder shafts between the floors
+      if (sh) ctx.drawImage(sh, x - 9, y, 18, 44); else { ctx.fillStyle = '#9aa0ab'; ctx.fillRect(x - 6, y, 12, 44); } });
+    const hx = 30; if (sh) ctx.drawImage(sh, hx - 7, SKY - 6, 14, 22); // from the surface hatch down to the airlock
+    if (IMG.base_hatch) ctx.drawImage(IMG.base_hatch, hx - 18, SKY - 22, 36, 24);
+    ctx.imageSmoothingEnabled = sm; }
+  let SMALLTINT = null;
+  function smallTint(im, x, y, color) { if (!im) return; if (!SMALLTINT) SMALLTINT = document.createElement('canvas');
+    if (SMALLTINT.width !== im.width || SMALLTINT.height !== im.height) { SMALLTINT.width = im.width; SMALLTINT.height = im.height; }
+    const g = SMALLTINT.getContext('2d'); g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, im.width, im.height); g.drawImage(im, 0, 0);
+    g.globalCompositeOperation = 'source-atop'; g.fillStyle = color; g.fillRect(0, 0, im.width, im.height); g.globalCompositeOperation = 'source-over'; ctx.drawImage(SMALLTINT, x, y); }
   function drawBase(t) {
     const s = S, moon = s.world === 'moon', L = light(s);
     ctx.fillStyle = moon ? '#000' : '#5a2a17'; ctx.fillRect(0, 0, CW, CH);
@@ -292,9 +313,9 @@
       if (!still && L > 0.5) { const gl = ((t / 2600) % 1.6) - 0.3; if (gl > 0 && gl < 1) ctx.drawImage(panelGlint(gl), 250, SKY - 64); } ctx.restore(); // sunlight glinting on the panels (only on the panels) // less sun: only the panels get darker, not a box around them
       if (!moon && s.clean < 0.9) { ctx.fillStyle = 'rgba(160,90,40,.55)'; ctx.fillRect(254, SKY - 58, 120, 30); } }
     if (!moon && IMG.reactor) ctx.drawImage(IMG.reactor, 182, SKY - 64);
-    ctx.fillStyle = moon ? '#3a3d45' : '#4a2414'; ctx.fillRect(0, SKY, CW, CH - SKY);
+    drawUnderground(moon);
     ROOMS.forEach((r, i) => { const [x, y] = roomXY(i), im = IMG['room_' + r.img]; if (im) ctx.drawImage(im, x, y);
-      if (isOn(r) === false) { ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x + 4, y + 4, RW - 8, RH - 8); }
+      if (isOn(r) === false) smallTint(im, x, y, 'rgba(0,0,0,.6)'); // lights off: darken the room picture only
       if (r.id === 'battery') { const k = Math.max(0, s.batt) / s.cap; ctx.fillStyle = '#000'; ctx.fillRect(x + 108, y + 18, 12, 50);
         ctx.fillStyle = k < .25 ? '#D55E00' : k < .5 ? '#E69F00' : '#009E73'; const h = r0(48 * k); ctx.fillRect(x + 109, y + 19 + 48 - h, 10, h); }
       if (r.id === 'shelter' && moon && s.M.rad) text(`SOIL ${s.shelter}/${RU.safeSoilCm} cm`, x + 34, y + RH - 6, s.shelter >= RU.safeSoilCm ? '#3ddc97' : '#ff9a3c', 9); // only in missions with solar storms
@@ -381,7 +402,7 @@
     if (r.id === 'airlock') { const bg = IMG[s.world === 'moon' ? 'bg_moon' : 'bg_mars'], wx = 286, wy = 50, ww = 90, wh = 60; ctx.fillStyle = '#9aa0a6'; ctx.fillRect(wx - 3, wy - 3, ww + 6, wh + 6);
       if (bg) ctx.drawImage(bg, 120, 40, 120, 80, wx, wy, ww, wh); const L = light(s); if (L < .9) { ctx.fillStyle = s.world === 'moon' ? `rgba(0,0,12,${(1 - L) * .75})` : `rgba(190,110,50,${(1 - L) * .7})`; ctx.fillRect(wx, wy, ww, wh); }
       text('outside', wx + ww / 2, wy + wh + 13, '#aab4ca', 10); }
-    if (r.id === 'oxygen' && s.broken) text('💥 RECYCLER BROKEN', 192, 300, '#ff7a3c', 15);
+    if (r.id === 'oxygen' && s.broken) { ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillRect(92, 44, 200, 24); text('💥 RECYCLER BROKEN', 192, 61, '#ff7a3c', 15); } // at the top, so it never covers the lines below
     C.lines.forEach((ln, i) => text(ln, 192, (r.id === 'greenhouse' ? 318 : 306) + i * 18, '#fff', 13));
     const here = S.jobs.map((j, kk) => j && roomFor(j) === r.id ? kk : -1).filter(kk => kk >= 0);
     here.forEach((kk, i) => { if (S.jobs[kk] === 'rest' && !(t - (CHEER[kk] || -1e9) < 1260)) { const [ax, ay, bag] = bedSpot(kk); drawSleeper(t, kk, ax, 40 + ay, 1.5, bag); return; } // in a bunk or sleeping bag
@@ -985,7 +1006,7 @@
     const L = feed.level, src = DATA.sources[feed.source]; sunWord = L.word; sunMult = L.mult; SIM.setSun(L); FEED_STATUS[feed.source] = feed.status;
     const score = c => ('BCMX'.indexOf(c[0]) * 100) + parseFloat(c.slice(1) || 0), big = (feed.flares || []).filter(f => f.cls).sort((a, b) => score(b.cls) - score(a.cls))[0];
     BIGFLARE = big ? `${big.cls}${big.peak ? ' on ' + new Date(big.peak).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''}` : '';
-    sunInfo = `<span class="tag2 ${STATUS_TAG[feed.status]}">${feed.status}</span> ${src.name} · ${feed.note}<p>In the last ${src.days} days the real Sun made <b>${L.total}</b> ${w('flare', 'flares')}: ${L.x} big (X), ${L.m} medium (M), ${L.small} small. Particle storms: <b>${L.particleStorms ? 'yes' : 'none'}</b>.</p><p>${BIGFLARE ? `<p>Biggest flare: <b>${BIGFLARE}</b>.</p>` : ''}<p>So the Sun's face is <b>${L.face}</b>, and storms in the Moon and Mars missions are ${L.size}.</p><div class="src"><span class="tag2 rule">GAME RULE</span>The real Sun sets how big storms are. Game days are not real days. · ${src.name}: ${src.url.replace('https://', '').replace(/\/$/, '')}</div>`;
+    sunInfo = `<span class="tag2 ${STATUS_TAG[feed.status]}">${feed.status}</span> ${src.name} · ${feed.note}<p>In the last ${src.days} days the real Sun made <b>${L.total}</b> ${w('flare', 'flares')}: ${L.x} big (X), ${L.m} medium (M), ${L.small} small. Particle storms: <b>${L.particleStorms ? 'yes' : 'none'}</b>.</p><p>${BIGFLARE ? `<p>Biggest flare: <b>${BIGFLARE}</b>.</p>` : ''}<p>So the Sun this week is <b>${L.face}</b>. This only matters in the two missions with solar storms (<b>Solar storm!</b> and <b>Call Earth</b>): their storm will be <b>${L.size}</b>. In the other missions it changes nothing.</p><div class="src"><span class="tag2 rule">GAME RULE</span>The real Sun sets how big storms are. Game days are not real days. · ${src.name}: ${src.url.replace('https://', '').replace(/\/$/, '')}</div>`;
   }
   async function loadSun() { setSun(await FEEDS.sun(new URLSearchParams(location.search))); }
   function placeSunButton() { const [x, y, r] = SUNPOS(), k = $('base').clientWidth / CW, R = r + 6;
