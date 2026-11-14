@@ -619,12 +619,12 @@
   function clearTimer() { if (timerId) { clearInterval(timerId); timerId = null; } }
   function countdown(secs, onTimeout) { // a visible clock for urgent decisions; can be switched off in settings
     if (!TIMERS) return; const bar = $('popcard').querySelector('.timer i'), txt = $('popcard').querySelector('.timertxt'); if (!bar) return; let t0 = performance.now(), lastTick = 99;
-    timerId = setInterval(() => { if (HOLD) { t0 += 100; return; } const left = secs - (performance.now() - t0) / 1000; bar.style.width = Math.max(0, left / secs * 100) + '%'; if (txt) txt.textContent = `⏱ ${Math.ceil(Math.max(0, left))} s to decide`;
+    timerId = setInterval(() => { if (HOLD) { t0 += 100; return; } const left = secs - (performance.now() - t0) / 1000; bar.style.width = Math.max(0, left / secs * 100) + '%'; if (txt) { const n = txt.querySelector('b'), v = String(Math.ceil(Math.max(0, left))); if (n && n.textContent !== v) n.textContent = v; } // only the number changes, so the ⏱ icon stays put
       if (left <= 5 && Math.ceil(left) < lastTick) { lastTick = Math.ceil(left); SFX.tick(); } if (left <= 0) { clearTimer(); onTimeout(); } }, 100); }
   $('pop').onclick = e => { if (e.target.id === 'pop' && !$('popcard').querySelector('[data-must]')) closeAll(); };
   addEventListener('keydown', e => { if (e.key === 'Escape' && !$('popcard').querySelector('[data-must]')) closeAll(); });
   const choice = (i, e, t, sub) => `<button class="big" data-c="${i}"><span class="e">${e}</span><span>${'ABC'[i]}. ${t}<small>${sub}</small></span></button>`;
-  const timerBox = () => TIMERS ? `<div class="timer"><i></i></div><div class="timertxt"></div>` : '';
+  const timerBox = () => TIMERS ? `<div class="timer"><i></i></div><div class="timertxt">⏱ <b></b> s to decide</div>` : '';
 
   const srcLine = src => src ? `<div class="src"><span class="tag2 real">${src.tag}</span>${src.text}</div>` : '';
   const eventVars = () => ({ cmd: CMD(), unit: S.unit, cargoDay: S.M.cargo ? S.M.cargo.day : '', foodDays: Math.floor(Math.max(0, S.food) / N.foodUse), sun: sunWord, sunSize: sunWord === 'STORMY' ? RU.sun.STORMY.size.toUpperCase() : RU.sun[sunWord].size,

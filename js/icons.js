@@ -23,12 +23,13 @@
   const RE = new RegExp('(' + Object.keys(MAP).sort((a, b) => b.length - a.length).map(esc).join('|') + ')\\uFE0F?', 'gu');
   const SKIP = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'OPTION', 'TITLE', 'CANVAS']);
 
+  // decoding = 'sync' below: a cached icon paints in the same frame, so re-drawn text does not blink.
   function fixText(tn) {
     const p = tn.parentNode, s = tn.nodeValue; if (!p || !s || SKIP.has(p.nodeName) || (p.closest && p.closest('[data-noicon]'))) return;
     RE.lastIndex = 0; if (!RE.test(s)) return; RE.lastIndex = 0;
     const frag = document.createDocumentFragment(); let last = 0, m;
     while ((m = RE.exec(s))) { if (m.index > last) frag.appendChild(document.createTextNode(s.slice(last, m.index)));
-      const im = document.createElement('img'); im.className = 'ico'; im.src = src(m[1]); im.alt = m[1]; im.draggable = false; frag.appendChild(im); last = m.index + m[0].length; }
+      const im = document.createElement('img'); im.className = 'ico'; im.decoding = 'sync'; im.src = src(m[1]); im.alt = m[1]; im.draggable = false; frag.appendChild(im); last = m.index + m[0].length; }
     if (last < s.length) frag.appendChild(document.createTextNode(s.slice(last)));
     p.replaceChild(frag, tn);
   }

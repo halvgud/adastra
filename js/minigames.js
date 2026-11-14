@@ -131,12 +131,15 @@
       return { ok: false, lit }; };
     path.forEach(([y, x]) => { const n = 1 + Math.floor(R() * 3); for (let i = 0; i < n; i++) grid[y][x] = rot(grid[y][x]); });
     if (flows().ok) { const [y, x] = path[0]; grid[y][x] = rot(grid[y][x]); }
-    const draw = () => { const f = flows();
-      el.innerHTML = `<div class="pipes" style="--cols:${COLS}">${grid.map((row, y) => `<span class="pend">${y === inRow ? '💧' : ''}</span>` + row.map((m, x) =>
-        `<button class="pipe ${f.lit.has(y + ',' + x) ? 'wet' : ''}" data-y="${y}" data-x="${x}" data-m="${GLYPH[m]}" aria-label="Pipe piece, row ${y + 1}, column ${x + 1}: tap to turn">${svg(m)}</button>`).join('') + `<span class="pend">${y === outRow ? '🚰' : ''}</span>`).join('')}</div>`;
-      el.querySelectorAll('.pipe').forEach(b => b.onclick = () => { grid[+b.dataset.y][+b.dataset.x] = rot(grid[+b.dataset.y][+b.dataset.x]); o.tap(); draw(); });
-      el.dataset.solved = f.ok ? '1' : ''; if (f.ok) setTimeout(o.win, 350); };
-    draw();
+    // The board is built once; a tap only redraws that piece and the wet pipes, so the 💧 and 🚰 icons never blink.
+    let won = false;
+    const refresh = () => { const f = flows(); el.querySelectorAll('.pipe').forEach(b => b.classList.toggle('wet', f.lit.has(b.dataset.y + ',' + b.dataset.x)));
+      el.dataset.solved = f.ok ? '1' : ''; if (f.ok && !won) { won = true; setTimeout(o.win, 350); } };
+    el.innerHTML = `<div class="pipes" style="--cols:${COLS}">${grid.map((row, y) => `<span class="pend">${y === inRow ? '💧' : ''}</span>` + row.map((m, x) =>
+        `<button class="pipe " data-y="${y}" data-x="${x}" data-m="${GLYPH[m]}" aria-label="Pipe piece, row ${y + 1}, column ${x + 1}: tap to turn">${svg(m)}</button>`).join('') + `<span class="pend">${y === outRow ? '🚰' : ''}</span>`).join('')}</div>`;
+    el.querySelectorAll('.pipe').forEach(b => b.onclick = () => { if (won) return; const y = +b.dataset.y, x = +b.dataset.x; grid[y][x] = rot(grid[y][x]);
+      b.innerHTML = svg(grid[y][x]); b.dataset.m = GLYPH[grid[y][x]]; o.tap(); refresh(); });
+    refresh();
   }
 
   // 🌱 Greenhouse: 12 pots growing at their own speed. A ring around each pot shows how much it has grown.
@@ -193,7 +196,7 @@
     el.innerHTML = `<p class="mgq" id="mgpow"></p><div class="tiles panel" style="--cols:6">${Array.from({ length: N }, (_, i) => `<button class="tile cell" data-i="${i}"></button>`).join('')}</div>`;
     const btns = [...el.querySelectorAll('.tile')];
     const show = () => { const windy = performance.now() - t0 < WIND;
-      btns.forEach((b, i) => { b.textContent = dust.has(i) ? '🟫' : ''; b.setAttribute('aria-label', dust.has(i) ? 'dusty spot: wipe it' : 'clean spot'); });
+      btns.forEach((b, i) => { const d = dust.has(i) ? '1' : ''; if (b.dataset.d !== d) { b.dataset.d = d; b.textContent = d ? '🟫' : ''; } b.setAttribute('aria-label', d ? 'dusty spot: wipe it' : 'clean spot'); }); // only touch a square that changed (the dust is a pixel icon, js/icons.js)
       el.querySelector('#mgpow').innerHTML = `⚡ Panel power: <b>${Math.round(100 * (1 - dust.size / N))} %</b>${windy ? ' · 💨 the wind is blowing!' : ' · the wind stopped'}`;
       if (!windy && !dust.size && !over) { over = true; clearInterval(timer); setTimeout(o.win, 300); } };
     const timer = setInterval(() => { if (!el.isConnected) { clearInterval(timer); return; }
