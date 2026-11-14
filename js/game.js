@@ -219,6 +219,32 @@
       if (live) { const by = ry + 2 - hop; ctx.fillStyle = '#fff'; ctx.fillRect(p.x - 9, by - 13, 18, 15); ctx.fillRect(p.x - 2, by + 2, 4, 3); ctx.fillStyle = '#000'; ctx.fillRect(p.x - 9, by - 13, 18, 1);
         ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(md.e, p.x, by - 2); ctx.textAlign = 'left'; } });
   }
+  // Animations inside a zoomed room (the room art fills x 0–384, y 40–280). Skipped when the player prefers reduced motion.
+  function roomAmbient(t, r, s) {
+    const busy = S.jobs.some(j => j && roomFor(j) === r.id), wave = (p, sp) => 0.5 + 0.5 * Math.sin(t / sp + p);
+    const rise = (n, x0, w, y0, h, sp, col, size) => { for (let i = 0; i < n; i++) { const ph = ((t / sp) + i / n) % 1, x = x0 + ((i * 37) % w) + Math.sin(t / 400 + i) * 3;
+      ctx.globalAlpha = 1 - ph; ctx.fillStyle = col; ctx.fillRect(x | 0, (y0 + h - ph * h) | 0, size, size); } ctx.globalAlpha = 1; };
+    if (r.id === 'airlock') { // status light, and the view outside
+      ctx.fillStyle = Math.floor(t / 700) % 2 ? '#3ddc97' : '#1f5f45'; ctx.fillRect(184, 46, 16, 6);
+      if (s.world === 'moon') for (let i = 0; i < 8; i++) { const a = wave(i * 1.7, 500); if (a > .7) { ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.fillRect(290 + (i * 23) % 82, 54 + (i * 13) % 30, 1, 1); } }
+      else for (let i = 0; i < 12; i++) { const x = 286 + ((i * 29 + t * 0.03) % 90); ctx.fillStyle = 'rgba(232,178,122,.7)'; ctx.fillRect(x | 0, 56 + (i * 7) % 50, 2, 1); }
+      if (busy) rise(6, 40, 200, 150, 110, 2600, 'rgba(255,255,255,.8)', 2); }            // suit air puffs while the crew gets ready
+    if (r.id === 'lab') { const sx = ((t / 1800) % 1) * 360 + 12; ctx.fillStyle = 'rgba(86,180,233,.18)'; ctx.fillRect(sx | 0, 52, 6, 216); // a scanner sweeping the samples
+      for (let i = 0; i < 6; i++) { ctx.fillStyle = wave(i * 2.1, 260) > .5 ? ['#3ddc97', '#F0E442', '#56B4E9'][i % 3] : '#1b2233'; ctx.fillRect(30 + i * 10, 60, 6, 4); } // blinking lights
+      if (busy) rise(10, 60, 260, 110, 150, 2000, '#F0E442', 3); }                                 // science sparks
+    if (r.id === 'greenhouse') { ctx.fillStyle = `rgba(214,120,255,${0.07 + 0.08 * wave(0, 900)})`; ctx.fillRect(12, 52, 360, 216); // grow-lights
+      for (let i = 0; i < 10; i++) { const ph = ((t / 1500) + i / 10) % 1; ctx.fillStyle = `rgba(120,200,255,${1 - ph})`; ctx.fillRect(40 + (i * 31) % 300, (70 + ph * 150) | 0, 2, 4); } // watering drops
+      if (busy) rise(8, 50, 280, 120, 130, 2400, '#7ee08a', 3); }                                  // little leaves
+    if (r.id === 'shelter') { if (busy && S.jobs.includes('rest')) for (let i = 0; i < 3; i++) { const ph = ((t / 2200) + i / 3) % 1; ctx.globalAlpha = 1 - ph; text('z', 120 + i * 50 + ph * 20, 190 - ph * 90, '#cfe3ff', 12 + ph * 10); ctx.globalAlpha = 1; } // sleeping
+      if (s.M.rad && s.shelter >= RU.safeSoilCm) { ctx.strokeStyle = `rgba(61,220,151,${0.2 + 0.3 * wave(0, 700)})`; ctx.lineWidth = 3; ctx.strokeRect(14, 54, 320, 212); }
+      const storm = s.events.find(e => !e.done && isStorm(e) && e.day - s.day <= 1); if (storm) { ctx.fillStyle = `rgba(213,94,0,${0.12 * wave(0, 300)})`; ctx.fillRect(12, 52, 360, 216); } } // storm warning
+    if (r.id === 'oxygen') { if (S.sw.maker) rise(12, 168, 50, 90, 140, 1700, 'rgba(200,240,255,.95)', 3); // bubbles inside the glass column: air being made
+      if (s.broken) for (let i = 0; i < 5; i++) { const ph = ((t / 900) + i / 5) % 1; ctx.fillStyle = `rgba(86,180,233,${1 - ph})`; ctx.fillRect(200 + i * 14, (200 + ph * 70) | 0, 3, 5); } } // a leak
+    if (r.id === 'battery') { const kk = Math.max(0, s.batt) / s.cap, h = 176 * kk, up = !PREV || PREV.net >= 0;
+      for (let i = 0; i < 3; i++) { const ph = ((t / 1300) + i / 3) % 1, yy = 72 + 176 - (up ? ph : 1 - ph) * h; if (h > 8) { ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fillRect(336, yy | 0, 26, 2); } }
+      if (up && L_of(s) > 0.3) for (let i = 0; i < 4; i++) { if (wave(i * 2.3, 120) > .93) { ctx.fillStyle = '#F0E442'; ctx.fillRect(300 + i * 8, 90 + i * 30, 3, 3); } } } // little sparks while charging
+  }
+  const L_of = s => light(s);
   function drawRoom(t, ri, zoomK) {
     const s = S, r = ROOMS[ri], im = IMG['room_' + r.img], [bx, by] = roomXY(ri), k = zoomK;
     const x = bx + (0 - bx) * k, y = by + (40 - by) * k, wd = RW + (384 - RW) * k, ht = RH + (240 - RH) * k;
@@ -227,6 +253,7 @@
     if (im) ctx.drawImage(im, x, y, wd, ht);
     if (k < 1) return;
     const C = roomCtx(ri);
+    if (!still && isOn(r) !== false) roomAmbient(t, r, s);
     if (isOn(r) === false) { ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(12, 52, 360, 216); text('LIGHTS OFF', 192, 160, '#aab4ca', 18); }
     if (C.badge) { ctx.fillStyle = 'rgba(0,0,0,.8)'; ctx.fillRect(250, 4, 130, 26); text(C.badge, 315, 22, C.badgeCol, 13); }
     if (r.id === 'battery') { const kk = Math.max(0, s.batt) / s.cap; ctx.fillStyle = '#000'; ctx.fillRect(334, 70, 30, 180);
@@ -301,6 +328,7 @@
     const G = T.minigames[j], src = DATA.sources[G.src]; S.mgTried = S.mgTried || {}; S.mgTried[j] = S.day; let over = false;
     popup(`<h2>${G.title}</h2>${mcSay(G.how)}${timerBox()}<div class="mg" id="mg"></div><div class="tip" id="mgtip"></div>
       <button class="big" id="mgskip"><span class="e">⏭</span><span>Not now<small>the job still gets done, without the bonus</small></span></button><span data-must></span>`);
+    $('popcard').classList.add('mgcard'); // a wider card: the boards scale with the screen (index.html → .mg --cs)
     const end = (win, msg) => { if (over) return; over = true; clearTimer();
       if (win) { S.mg = S.mg || {}; S.mg[j] = true; SFX.star(); FX = { kind: 'confetti', t0: performance.now(), dur: 1500 }; } else SFX.lose();
       popup(`<h2>${win ? '🎉 Well done!' : '👍 Good try!'}</h2>${mcSay(win ? `You did it, ${CMD()}! Bonus: <b>${miniBonus(j)}</b> when the ${S.unit} ends.` : `${msg || 'Time is up.'} The job still gets done today. You can try again tomorrow.`)}
@@ -443,7 +471,7 @@
   // ---------- popups with Mission Control ----------
   const mcSay = html => `<div class="mc"><span class="aiwrap"><img src="${MCIMG}" data-mc alt="${mcLabel()}"><i class="aitag">AI</i></span><div class="bubble"><div class="mcname">${mcLabel()}</div>${html}</div><button class="read" aria-label="Read this aloud">🔊</button></div>`;
   let timerId = null;
-  function popup(html) { clearTimer(); hush(); $('popcard').innerHTML = html; $('pop').classList.add('show'); $('popcard').querySelectorAll('[data-close]').forEach(b => b.onclick = closeAll); bindWords($('popcard'));
+  function popup(html) { clearTimer(); hush(); $('popcard').classList.remove('mgcard'); $('popcard').innerHTML = html; $('pop').classList.add('show'); $('popcard').querySelectorAll('[data-close]').forEach(b => b.onclick = closeAll); bindWords($('popcard'));
     bindRead($('popcard'));
     const b = $('popcard').querySelector('button.primary') || $('popcard').querySelector('input') || $('popcard').querySelector('button'); if (b) b.focus(); }
   function closeAll() { clearTimer(); hush(); $('pop').classList.remove('show'); }
