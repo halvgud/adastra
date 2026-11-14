@@ -153,7 +153,7 @@
   }
   async function loadArt() {
     const jobs = [load('bg_moon', ART + 'bg/moon.png'), load('bg_mars', ART + 'bg/mars.png'), load('panels', ART + 'props/solar-panels.png'), load('reactor', ART + 'props/reactor.png'), load('rover', ART + 'props/rover.png'), ...['soil-moon', 'soil-mars', 'tunnel', 'shaft', 'hatch'].map(n => load('base_' + n, ART + 'base/' + n + '.png')), load('south', ART + 'astronaut/Idle/rotations/south.png'), load('north', ART + 'astronaut/Idle/rotations/north.png')];
-    ROOMS.forEach(r => jobs.push(load('room_' + r.img, ART + 'rooms/' + r.img + '.png'), load('cell_' + r.id, ART + 'cells/' + r.id + '.png'), load('cellm_' + r.id, ART + 'cells/' + r.id + '-mars.png')));
+    ROOMS.forEach(r => jobs.push(load('room_' + r.img, ART + 'rooms/' + r.img + '.png'), load('cell_' + r.id, ART + 'cells/' + r.id + '.png'), load('roomm_' + r.img, ART + 'rooms/' + r.img + '-mars.png'), load('roomn_' + r.img, ART + 'rooms/' + r.img + '-moon.png'), load('cellm_' + r.id, ART + 'cells/' + r.id + '-mars.png')));
     Object.keys(MISSIONS).forEach(k => jobs.push(load('patch_' + k, patchSrc(k))));
     // Each animation is one strip of frames side by side (assets/pixellab/astronaut/strips/, made by tools/build_atlas.py)
     ['walk', 'idle', ...Object.keys(ACTS), ...['w', 'm'].flatMap(g => INDOOR.map(n => `in-${g}-${n}`))].forEach(a => jobs.push(load('strip_' + a, `${ART}astronaut/strips/${a}.png`)));
@@ -162,7 +162,7 @@
       for (let i = 0; i < n; i++) { const c = document.createElement('canvas'); c.width = c.height = h; c.getContext('2d').drawImage(st, i * h, 0, h, h, 0, 0, h, h); IMG[key(i)] = c; } };
     cut('walk', i => 'walk' + i); cut('idle', i => 'idle' + i); Object.keys(ACTS).forEach(a => cut(a, i => `act_${a}${i}`));
     ['w', 'm'].forEach(g => INDOOR.forEach(n => cut(`in-${g}-${n}`, i => `in_${g}_${n}${i}`)));
-    ROOMS.forEach(r => { if (IMG['room_' + r.img]) IMG['room_' + r.img] = keyOut(IMG['room_' + r.img]); });
+    ROOMS.forEach(r => ['room_', 'roomm_', 'roomn_'].forEach(p => { if (IMG[p + r.img]) IMG[p + r.img] = keyOut(IMG[p + r.img]); }));
     CREW.forEach((c, k) => { SPR.walk[k] = []; SPR.idle[k] = [];
       const look = (key, img) => { const cv = recolor(img, c.col); return k === 0 && COMMANDER.glasses ? addGlasses(cv, key) : cv; };
       for (let i = 0; i < 6; i++) if (IMG['walk' + i]) SPR.walk[k].push(look('walk' + i, IMG['walk' + i]));
@@ -287,6 +287,7 @@
   // The rooms are one base dug into the ground, seen as a cut-away from the side: soil around them, pressurised tunnels
   // between neighbours, ladder shafts between the two floors, and a hatch on the surface above the airlock.
   // Drawn before the rooms, so each tunnel's ends disappear into the rooms. Pieces: assets/pixellab/base/ (PixelLab).
+  const roomPic = r => IMG[(S && S.world === 'mars' ? 'roomm_' : 'roomn_') + r.img] || IMG['room_' + r.img]; // zoomed room: rust tones on Mars, silver on the Moon (tools/mars_tint.py)
   const cellImg = r => IMG[(S && S.world === 'mars' ? 'cellm_' : 'cell_') + r.id] || IMG['cell_' + r.id] || IMG['room_' + r.img];
   function drawUnderground(moon) {
     const soil = IMG[moon ? 'base_soil-moon' : 'base_soil-mars'];
@@ -362,7 +363,7 @@
   // Animations inside a zoomed room (the room art fills x 0–384, y 40–280). Skipped when the player prefers reduced motion.
   // Colour the zoomed room picture itself (grow-light pink, lights-off dark) instead of a rectangle that spills outside it.
   let ROOMTINT = null;
-  function roomTint(r, color) { const im = IMG['room_' + r.img]; if (!im) return;
+  function roomTint(r, color) { const im = roomPic(r); if (!im) return;
     if (!ROOMTINT) { ROOMTINT = document.createElement('canvas'); ROOMTINT.width = im.width; ROOMTINT.height = im.height; }
     const g = ROOMTINT.getContext('2d'); g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, ROOMTINT.width, ROOMTINT.height); g.drawImage(im, 0, 0);
     g.globalCompositeOperation = 'source-atop'; g.fillStyle = color; g.fillRect(0, 0, ROOMTINT.width, ROOMTINT.height); g.globalCompositeOperation = 'source-over';
@@ -393,7 +394,7 @@
   }
   const L_of = s => light(s);
   function drawRoom(t, ri, zoomK) {
-    const s = S, r = ROOMS[ri], im = IMG['room_' + r.img], [bx, by] = roomXY(ri), k = zoomK;
+    const s = S, r = ROOMS[ri], im = roomPic(r), [bx, by] = roomXY(ri), k = zoomK;
     const x = bx + (0 - bx) * k, y = by + (40 - by) * k, wd = RW + (384 - RW) * k, ht = RH + (240 - RH) * k;
     if (k < 1) { drawBase(t); ctx.fillStyle = `rgba(0,0,0,${k * 0.9})`; ctx.fillRect(0, 0, CW, CH); }
     else { ctx.fillStyle = s.world === 'moon' ? '#0c1222' : '#1c0e08'; ctx.fillRect(0, 0, CW, CH); for (let i = 0; i < 40; i++) { ctx.fillStyle = '#2b3550'; ctx.fillRect((i * 97) % CW, (i * 53) % 36, 1, 1); }

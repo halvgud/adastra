@@ -34,7 +34,9 @@
   const ready = im => !!(im && im.complete && im.naturalWidth);
   ['rock-moon-0', 'rock-moon-1', 'rock-moon-2', 'rock-mars-0', 'rock-mars-1', 'rock-mars-2', 'sample', 'hills-moon', 'hills-mars', 'ground-moon', 'ground-mars',
     'assets/pixellab/props/solar-panels.png', 'assets/pixellab/mg/solar.png', 'assets/pixellab/mg/dust.png', 'assets/pixellab/mg/sandbag.png', 'assets/pixellab/garden/lettuce.png', 'habitat', 'antenna', 'lander', 'corr-wall', 'corr-floor', 'corr-ceil', 'corr-door', 'microscope',
-    'assets/pixellab/rooms/lab.png', 'assets/pixellab/rooms/oxygen.png', 'assets/pixellab/rooms/greenhouse.png'].forEach(fx);
+    'assets/pixellab/rooms/lab.png', 'assets/pixellab/rooms/oxygen.png', 'assets/pixellab/rooms/greenhouse.png',
+    'assets/pixellab/rooms/lab-mars.png', 'assets/pixellab/rooms/oxygen-mars.png', 'assets/pixellab/rooms/greenhouse-mars.png',
+    'assets/pixellab/rooms/lab-moon.png', 'assets/pixellab/rooms/oxygen-moon.png', 'assets/pixellab/rooms/greenhouse-moon.png'].forEach(fx);
   const PIX = {}; function pixelsOf(n) { // the RGBA of a picture, read once
     if (PIX[n] !== undefined) return PIX[n]; const im = fx(n); if (!ready(im)) return null;
     try { const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const g = c.getContext('2d'); g.drawImage(im, 0, 0); PIX[n] = { w: im.width, h: im.height, d: g.getImageData(0, 0, im.width, im.height).data }; } catch (e) { PIX[n] = false; } return PIX[n]; }
@@ -252,13 +254,14 @@
     },
   };
   // The doorway on screen: the room is drawn inside the part of the door that is open; at the end you step in (zoom).
+  const DOORWORLD = { mars: false }; // set by play(): the room behind the door matches the world
   function doorView(g, c, open, job, t) {
     const draw = ROOMVIEW[job]; if (!draw || open <= 0) return;
     const te = LEND - c.y, sx = u => W / 2 + (u - c.x) / te * F, top = c.hy - (2.0 - CAM) * F / te, bot = c.hy + CAM * F / te;
     const z = 1 + ease(seg(t, 4700, 5300)) * 0.9, fx0 = sx(-0.75), fw = sx(0.75) - fx0, fh = bot - top, cx = fx0 + fw / 2, cy = top + fh * 0.5;
     const gx0 = sx(-open * 0.75), gw = sx(open * 0.75) - gx0; // the open part of the door, growing with you as you step in
     g.save(); g.beginPath(); g.rect(cx + (gx0 - cx) * z, cy + (top - cy) * z, gw * z, fh * z); g.clip();
-    const pic = fx(`assets/pixellab/rooms/${{ lab: 'lab', fix: 'oxygen', tend: 'greenhouse' }[job]}.png`), rx = cx - fw * z / 2, ry = cy - fh * z / 2, rw = fw * z, rh = fh * z;
+    const pic = fx(`assets/pixellab/rooms/${{ lab: 'lab', fix: 'oxygen', tend: 'greenhouse' }[job]}${DOORWORLD.mars ? '-mars' : '-moon'}.png`), rx = cx - fw * z / 2, ry = cy - fh * z / 2, rw = fw * z, rh = fh * z;
     if (ready(pic)) { // the room's own PixelLab picture (the same one the base shows), cropped to fill the doorway
       g.fillStyle = '#1b1f2b'; g.fillRect(rx, ry, rw, rh); const sc = Math.max(rw / pic.width, rh / pic.height), dw = pic.width * sc, dh = pic.height * sc;
       g.imageSmoothingEnabled = false; g.drawImage(pic, rx + (rw - dw) / 2, ry + rh - dh, dw, dh); }
@@ -402,6 +405,7 @@
     g.textAlign = 'center'; const y = 24 - k * 4; g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, y - size, W, size + 7); g.fillStyle = '#000'; g.fillText(S.banner, W / 2 + 1, y + 1); g.fillStyle = '#F0E442'; g.fillText(S.banner, W / 2, y); g.globalAlpha = 1; }
 
   function play(host, opt, done) {
+    DOORWORLD.mars = opt.world === 'mars';
     const S = SCENES[opt.job] || SCENES.trip, moon = opt.world !== 'mars', still = !!opt.still, fixed = opt.at != null, sound = opt.sound || (() => {});
     host.innerHTML = `<div class="eva"><canvas width="${W}" height="${H}" aria-label="A short animation of the job you just finished"></canvas><button class="evaskip" type="button">Skip ⏭</button></div>`;
     const cv = host.querySelector('canvas'), g = cv.getContext('2d'), img = g.createImageData(W, H);
