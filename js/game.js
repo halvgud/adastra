@@ -18,14 +18,15 @@
   //   ?clean=<passphrase>  no name, and the "AI" marks are hidden
   //   ?mc=off or ?clean=off  back to normal (anonymous, with the AI marks)
   // The public game always shows the AI marks (Space Apps rule): use these modes only for private viewing, never for the demo.
-  let NOAI = false;
+  let NOAI = false, PRIVQ = ''; // PRIVQ: '?mc=…' or '?clean=…' while a private mode is on
   async function unlockName() {
     const q = new URLSearchParams(location.search); let pass = q.get('mc'), mode = 'name';
     if (q.get('clean')) { pass = q.get('clean'); mode = 'clean'; }
     if (pass === 'off') { store.set('jamt-mc', ''); store.set('jamt-mcmode', ''); pass = null; }
     else if (pass) { store.set('jamt-mc', pass); store.set('jamt-mcmode', mode); }
     else { pass = store.get('jamt-mc'); mode = store.get('jamt-mcmode') || 'name'; }
-    if (q.has('mc') || q.has('clean')) { q.delete('mc'); q.delete('clean'); const s = q.toString(); try { history.replaceState(null, '', location.pathname + (s ? '?' + s : '') + location.hash); } catch (e) {} } // keep the key out of the address bar
+    if (q.has('mc') || q.has('clean')) { if (!pass) { q.delete('mc'); q.delete('clean'); const s = q.toString(); try { history.replaceState(null, '', location.pathname + (s ? '?' + s : '') + location.hash); } catch (e) {} } } // "off" is removed from the address; a private mode stays in it
+    PRIVQ = pass ? `?${mode === 'clean' ? 'clean' : 'mc'}=${encodeURIComponent(pass)}` : ''; // and goes on in the links the game makes (the share link at the end)
     const X = MC.secretName; if (!pass || !X || !(window.crypto && crypto.subtle)) return;
     try { const b = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
       const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
@@ -1005,7 +1006,7 @@
     if (!NOAI) { g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(1020, 90, 50, 28); say('AI', 1045, 110, 18, '#ffffff', 800); } // visible AI watermark (Space Apps rule; hidden only in private mode)
     return c;
   }
-  function shareText(run) { const m = MISSIONS[run.key], url = SITE ? ` ${SITE}#${run.key}-${run.code}` : /^https?:$/.test(location.protocol) ? ` ${location.origin}${location.pathname}#${run.key}-${run.code}` : '';
+  function shareText(run) { const m = MISSIONS[run.key], url = SITE ? ` ${SITE}${PRIVQ}#${run.key}-${run.code}` : /^https?:$/.test(location.protocol) ? ` ${location.origin}${location.pathname}${PRIVQ}#${run.key}-${run.code}` : '';
     const where = m.world === 'moon' ? 'the Moon' : 'Mars', how = `Play the same mission: "${m.title}", code #${run.code}.`;
     return run.stars >= run.goal ? `I earned the "${m.title}" mission patch on ${where} with ${run.stars} science stars! 🚀 Can you do it too? ${how}${url}`
       : `I completed the "${m.title}" mission on ${where} with ${run.stars} science stars! 🚀 Can you beat me? ${how}${url}`; }
