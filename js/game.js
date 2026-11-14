@@ -254,6 +254,17 @@
     if (PREV) { const [bx, by] = roomXY(5), k = Math.max(0, S.batt) / S.cap, h = 48 * k, ph = (t / 1100) % 1, up = PREV.net >= 0, yy = by + 19 + 48 - (up ? ph * h : (1 - ph) * h);
       if (h > 4) { ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(bx + 109, yy | 0, 10, 2); } } // charge moving in the battery
   }
+  // Where resting astronauts sleep, in the shelter picture's own coordinates (384 x 240): the lower and upper bunk,
+  // then sleeping bags on the floor. bag = true for the floor spots.
+  const BEDS = [[195, 167, false], [195, 109, false], [78, 214, true], [318, 214, true]];
+  function bedSpot(k) { const i = S.jobs.filter((j, kk) => j === 'rest' && kk < k).length; return BEDS[Math.min(i, BEDS.length - 1)]; }
+  function drawSleeper(t, k, x, y, s, bag) { // lying on the back, head on the right, under a blanket; breathing and z's
+    const fr = (SPR.idle[k] || [])[0]; if (!fr) return; const br = still ? 0 : Math.sin(t / 700 + k) * 0.8 * s;
+    if (bag) { ctx.fillStyle = '#2f5d8a'; ctx.fillRect(x - 32 * s, y - 9 * s, 56 * s, 18 * s); ctx.fillStyle = '#4a86c2'; ctx.fillRect(x - 32 * s, y - 9 * s, 56 * s, 4 * s); } // sleeping bag
+    ctx.save(); ctx.translate(x, y - br); ctx.rotate(Math.PI / 2); ctx.drawImage(fr, -34 * s, -34 * s, 68 * s, 68 * s); ctx.restore();
+    ctx.fillStyle = bag ? '#3b74b0' : '#7a5aa8'; ctx.fillRect(x - 30 * s, y - 8 * s - br, 36 * s, 16 * s);            // blanket up to the chest
+    ctx.fillStyle = bag ? '#5c97d6' : '#9677c4'; ctx.fillRect(x - 30 * s, y - 8 * s - br, 36 * s, 3 * s); ctx.fillRect(x - 6 * s, y - 8 * s - br, 3 * s, 16 * s);
+    if (!still) { const zph = (t / 1600 + k * 0.3) % 1; ctx.globalAlpha = 1 - zph; text('z', x + 20 * s + zph * 14 * s, y - 14 * s - zph * 30 * s, '#cfe3ff', Math.max(8, (9 + zph * 6) * s * 1.6)); ctx.globalAlpha = 1; } }
   function drawBase(t) {
     const s = S, moon = s.world === 'moon', L = light(s);
     ctx.fillStyle = moon ? '#000' : '#5a2a17'; ctx.fillRect(0, 0, CW, CH);
@@ -294,11 +305,9 @@
       const fr = (moving ? SPR.walk[k] : SPR.idle[k]) || []; if (!fr.length) return;
       const cheer = !still && actFrame(k, 'cheer', t); // just won a puzzle, or was tapped: a happy jump
       if (cheer) { drawSprite(cheer, p.x, ry + RH - 9, p.facing, 1); if (k === 0) text('★', p.x, ry + RH - 52, '#ff9a3c', 9); return; }
-      if (job === 'rest' && !still) { // lying down for a nap
-        const lx = Math.max(rx + 40, Math.min(rx + RW - 40, p.x)), sl = actFrame(k, 'sleep', t); p.x = lx;
-        if (sl) drawSprite(sl, lx, ry + RH - 9, p.facing, 1); else { const breathe = Math.sin(t / 700 + k) * 0.6; ctx.save(); ctx.translate(lx, ry + RH - 22 + breathe); ctx.rotate(-Math.PI / 2); ctx.drawImage(fr[0], -30, -30, 60, 60); ctx.restore(); }
-        const zph = (t / 1600 + k * 0.3) % 1; ctx.globalAlpha = 1 - zph; text('z', p.x + 12 + zph * 10, ry + RH - 40 - zph * 22, '#cfe3ff', 9 + zph * 6); ctx.globalAlpha = 1;
-        if (k === 0) text('★', p.x - 22, ry + RH - 34, '#ff9a3c', 9); return; }
+      if (job === 'rest') { // asleep in a bunk (or a sleeping bag) in the shelter
+        const [ax, ay, bag] = bedSpot(k), sx = RW / 384, sy = RH / 240; p.x = rx + ax * sx; drawSleeper(t, k, rx + ax * sx, ry + ay * sy, 0.55, bag);
+        if (k === 0) text('★', rx + ax * sx + 16, ry + ay * sy - 8, '#ff9a3c', 8); return; }
       const work = !moving && !still && job ? Math.abs(Math.sin(t / 180 + k)) * 1.5 : 0; // a small busy bob while working
       const busy = !moving && !still && JOBANIM[job] && actFrame(k, JOBANIM[job], t); // watering, repairing
       drawSprite(busy || fr[Math.floor(t / (moving ? 110 : 260)) % fr.length], p.x, ry + RH - 9 - hop - (busy ? 0 : work), p.facing, 1);
@@ -355,7 +364,8 @@
     if (r.id === 'oxygen' && s.broken) text('💥 RECYCLER BROKEN', 192, 300, '#ff7a3c', 15);
     C.lines.forEach((ln, i) => text(ln, 192, (r.id === 'greenhouse' ? 318 : 306) + i * 18, '#fff', 13));
     const here = S.jobs.map((j, kk) => j && roomFor(j) === r.id ? kk : -1).filter(kk => kk >= 0);
-    here.forEach((kk, i) => { const fr = SPR.idle[kk] || [], jt = t - (JUMP[kk] || -9999), cheer = !still && actFrame(kk, 'cheer', t);
+    here.forEach((kk, i) => { if (S.jobs[kk] === 'rest' && !(t - (CHEER[kk] || -1e9) < 1260)) { const [ax, ay, bag] = bedSpot(kk); drawSleeper(t, kk, ax, 40 + ay, 1.5, bag); return; } // in a bunk or sleeping bag
+      const fr = SPR.idle[kk] || [], jt = t - (JUMP[kk] || -9999), cheer = !still && actFrame(kk, 'cheer', t);
       const hop = !cheer && jt < 500 && !still ? Math.sin(jt / 500 * Math.PI) * 26 : 0; // tapped: a happy jump (or a little hop)
       if (!cheer && S.jobs[kk] === 'lab' && SPR.back[kk]) { atComputer(t, kk, hop); return; }
       const busy = !still && JOBANIM[S.jobs[kk]] && actFrame(kk, JOBANIM[S.jobs[kk]], t);

@@ -28,21 +28,40 @@
     return (TEX[seed] = { N, t });
   }
 
+  // ---------- PixelLab pictures for the outside scenes (assets/pixellab/fx/): ground textures, far hills, rocks, the sample ----------
+  // Loaded when this file loads. Until a picture is ready (or from file://, where pixels cannot be read), the code-drawn version is used.
+  const FXI = {}, fx = n => { if (!FXI[n]) { FXI[n] = new Image(); FXI[n].src = n.includes('/') ? n : 'assets/pixellab/fx/' + n + '.png'; } return FXI[n]; };
+  const ready = im => !!(im && im.complete && im.naturalWidth);
+  ['rock-moon-0', 'rock-moon-1', 'rock-moon-2', 'rock-mars-0', 'rock-mars-1', 'rock-mars-2', 'sample', 'hills-moon', 'hills-mars', 'ground-moon', 'ground-mars',
+    'assets/pixellab/props/solar-panels.png', 'assets/pixellab/mg/solar.png', 'assets/pixellab/mg/dust.png', 'assets/pixellab/mg/sandbag.png', 'assets/pixellab/garden/lettuce.png'].forEach(fx);
+  const PIX = {}; function pixelsOf(n) { // the RGBA of a picture, read once
+    if (PIX[n] !== undefined) return PIX[n]; const im = fx(n); if (!ready(im)) return null;
+    try { const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const g = c.getContext('2d'); g.drawImage(im, 0, 0); PIX[n] = { w: im.width, h: im.height, d: g.getImageData(0, 0, im.width, im.height).data }; } catch (e) { PIX[n] = false; } return PIX[n]; }
+  const HILLS = {}; function hillsOf(n) { // the hills strip with its sky made transparent (flood from the edges, by the corner colour)
+    if (HILLS[n] !== undefined) return HILLS[n]; const im = fx(n); if (!ready(im)) return null;
+    try { const c = document.createElement('canvas'), w = im.width, h = im.height; c.width = w; c.height = h; const g = c.getContext('2d'); g.drawImage(im, 0, 0); const D = g.getImageData(0, 0, w, h), p = D.data, r = [p[0], p[1], p[2]], seen = new Uint8Array(w * h), q = [];
+      for (let x = 0; x < w; x++) q.push([x, 0]); for (let y = 0; y < h; y++) q.push([0, y], [w - 1, y]);
+      while (q.length) { const [x, y] = q.pop(); if (x < 0 || y < 0 || x >= w || y >= h || seen[y * w + x]) continue; seen[y * w + x] = 1; const i = (y * w + x) * 4;
+        if (Math.abs(p[i] - r[0]) + Math.abs(p[i + 1] - r[1]) + Math.abs(p[i + 2] - r[2]) > 60) continue; p[i + 3] = 0; q.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]); }
+      g.putImageData(D, 0, 0); HILLS[n] = c; } catch (e) { HILLS[n] = false; } return HILLS[n]; }
+
   // ---------- outside: sky, hills and ground in perspective, then things standing on the ground ----------
   function outsideWorld(moon, path, clear) { // path(s) = x of the walking line at distance s; clear = keep rocks this far off it
     const rnd = mkRnd(moon ? 99 : 131), rocks = [];
-    for (let i = 0; i < 60; i++) { const y = -2 + rnd() * 34, x = (rnd() - 0.5) * 18; if (Math.abs(x - path(y)) < (clear || 1.1)) continue; rocks.push({ x, y, r: 0.15 + rnd() * 0.45, k: 'rock' }); }
+    for (let i = 0; i < 60; i++) { const y = -2 + rnd() * 34, x = (rnd() - 0.5) * 18; if (Math.abs(x - path(y)) < (clear || 1.1)) continue; rocks.push({ x, y, r: 0.15 + rnd() * 0.45, k: 'rock', v: i % 3 }); }
     return { moon, tex: makeTex(moon ? 7 : 11), rocks, stars: Array.from({ length: 70 }, () => ({ a: rnd() * 6.283, y: rnd() * 44, b: rnd() })),
       ground: moon ? [150, 150, 156] : [178, 98, 58], fogC: moon ? [8, 8, 14] : [214, 160, 118], fogD: moon ? 40 : 22,
       skyTop: moon ? [2, 2, 8] : [196, 128, 92], skyLow: moon ? [10, 10, 22] : [232, 186, 140] };
   }
   const ridge = a => 4 + 3 * Math.sin(a * 3.1) + 2 * Math.sin(a * 7.3 + 1) + 1.2 * Math.sin(a * 17.9);
   function drawOutside(g, img, E, c, extra, t) {
-    const px = img.data, ca = Math.cos(c.a), sa = Math.sin(c.a), N = E.tex.N, T = E.tex.t;
+    const px = img.data, ca = Math.cos(c.a), sa = Math.sin(c.a), N = E.tex.N, T = E.tex.t, GT = pixelsOf(E.moon ? 'ground-moon' : 'ground-mars') || null; // GT: PixelLab ground texture
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; px[i + 3] = 255;
       if (y <= c.hy) { const k = clamp((y - (c.hy - 50)) / 50, 0, 1); for (let j = 0; j < 3; j++) px[i + j] = E.skyTop[j] + (E.skyLow[j] - E.skyTop[j]) * k; continue; }
       const d = CAM * F / (y - c.hy), lat = (x - W / 2) / F * d, wx = c.x + sa * d + ca * lat, wy = c.y + ca * d - sa * lat;
-      const v = T[((((wy * 9) | 0) & (N - 1)) * N) + (((wx * 9) | 0) & (N - 1))], fog = Math.min(1, d / E.fogD);
+      const fog = Math.min(1, d / E.fogD);
+      if (GT) { const tx = (((wx * 7) | 0) % GT.w + GT.w) % GT.w, ty = (((wy * 7) | 0) % GT.h + GT.h) % GT.h, gi = (ty * GT.w + tx) * 4; for (let j = 0; j < 3; j++) px[i + j] = GT.d[gi + j] * (1 - fog) + E.fogC[j] * fog; continue; }
+      const v = T[((((wy * 9) | 0) & (N - 1)) * N) + (((wx * 9) | 0) & (N - 1))];
       for (let j = 0; j < 3; j++) px[i + j] = E.ground[j] * v * (1 - fog) + E.fogC[j] * fog; }
     g.putImageData(img, 0, 0);
     const angX = a => W / 2 + Math.tan(a) * F;
@@ -52,12 +71,22 @@
       g.fillStyle = '#3aa35a'; g.fillRect(ex - 3, ey - 2, 3, 3); g.fillRect(ex + 1, ey + 1, 3, 2); g.fillStyle = 'rgba(255,255,255,.8)'; g.fillRect(ex - 5, ey - 4, 4, 1); g.fillRect(ex, ey + 4, 4, 1);
       g.fillStyle = 'rgba(0,0,0,.55)'; g.beginPath(); g.arc(ex + 3, ey, 7, -1.57, 1.57); g.fill(); }
     else { const sx = angX(-0.4 - c.a), sy = c.hy - 34; g.fillStyle = 'rgba(255,240,220,.35)'; g.beginPath(); g.arc(sx, sy, 6, 0, 6.283); g.fill(); g.fillStyle = '#fff4e6'; g.beginPath(); g.arc(sx, sy, 3, 0, 6.283); g.fill(); }
-    for (let x = 0; x < W; x++) { const h = ridge(c.a + Math.atan((x - W / 2) / F)); g.fillStyle = E.moon ? '#3a3a44' : '#a8603e'; g.fillRect(x, c.hy - h, 1, h + 1); }
+    // far hills (PixelLab strip) that turn with you; code-drawn ridge until it is ready
+    const HL = hillsOf(E.moon ? 'hills-moon' : 'hills-mars');
+    if (HL) { const sh = 26, sw = HL.width * sh / HL.height, off = (((-c.a * 150) % sw) + sw) % sw; g.imageSmoothingEnabled = false; for (let x = -off - sw; x < W; x += sw) g.drawImage(HL, x, c.hy - sh + 3, sw, sh); }
+    else for (let x = 0; x < W; x++) { const h = ridge(c.a + Math.atan((x - W / 2) / F)); g.fillStyle = E.moon ? '#3a3a44' : '#a8603e'; g.fillRect(x, c.hy - h, 1, h + 1); }
     const items = E.rocks.concat(extra), seen = {};
     items.forEach(o => { const rx = o.x - c.x, ry = o.y - c.y; o.d = rx * sa + ry * ca; o.l = rx * ca - ry * sa; });
     items.filter(o => o.d > 0.35).sort((p, q) => q.d - p.d).forEach(o => {
       const sx = W / 2 + o.l / o.d * F, gy = c.hy + CAM * F / o.d, u = F / o.d, fog = Math.min(1, o.d / E.fogD);
       seen[o.k] = { sx, gy, u }; if (sx < -60 || sx > W + 60 || o.hide) return;
+      // a PixelLab rock (or the crystal sample); the code-drawn one below until the pictures are ready
+      const pic = o.k === 'rock' ? fx(`rock-${E.moon ? 'moon' : 'mars'}-${o.v || 0}`) : o.k === 'sample' ? fx('sample') : null;
+      if (pic && ready(pic)) { const w = o.r * u * (o.k === 'sample' ? 2.4 : 2.8), h = w * pic.height / pic.width;
+        g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(sx - w * 0.45, gy - 1, w * 0.9, Math.max(1, h * 0.12)); g.imageSmoothingEnabled = false; g.globalAlpha = 1 - fog * 0.85;
+        g.drawImage(pic, sx - w / 2, gy - h * 0.92, w, h); g.globalAlpha = 1;
+        if (o.k === 'sample') { const tw = 0.5 + 0.5 * Math.sin(t / 120), sz = Math.max(1, u * 0.06); g.fillStyle = `rgba(240,228,66,${0.5 + 0.5 * tw})`; g.fillRect(sx + w * 0.15 - sz / 2, gy - h * 0.8 - sz, sz, sz * 2); g.fillRect(sx + w * 0.15 - sz * 1.5, gy - h * 0.8 - sz * 0.5, sz * 3, sz); } // a twinkle on the crystals
+        return; }
       if (o.k === 'rock' || o.k === 'sample') { const w = o.r * u * 2, h = o.r * u * 1.2, base = o.k === 'sample' ? [120, 90, 160] : E.ground;
         g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(sx - w / 2, gy - 1, w * 1.1, Math.max(1, h * 0.25));
         g.fillStyle = rgb(base, 0.7, fog, E.fogC); g.beginPath(); g.ellipse(sx, gy - h / 2, w / 2, h / 2, 0, 0, 6.283); g.fill();
@@ -67,6 +96,10 @@
       if (o.k === 'buddy') { const hgt = 1.8 * u, sw = hgt * 68 / 46, bob = c.walking ? (E.moon ? Math.abs(Math.sin(t / 420 + 1)) * u * 0.25 : Math.abs(Math.sin(t / 190)) * u * 0.05) : 0;
         g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(sx - hgt * 0.2, gy - 1, hgt * 0.4, Math.max(1, hgt * 0.05));
         g.imageSmoothingEnabled = false; g.drawImage(o.img, sx - sw / 2, gy - bob - sw * 56 / 68, sw, sw); }
+      // the base's own solar panels (PixelLab picture), a bit dusty; simple blue panels until it is ready
+      if (o.k === 'panels' && ready(fx('assets/pixellab/props/solar-panels.png'))) { const pi = fx('assets/pixellab/props/solar-panels.png'), w = 6.4 * u, h = w * pi.height / pi.width;
+        g.imageSmoothingEnabled = false; g.globalAlpha = 1 - fog * 0.85; g.drawImage(pi, sx - w / 2, gy - h * 0.95, w, h); g.globalAlpha = 1; return; }
+      if (o.k === 'panels') { [-2.4, 0, 2.4].forEach(dx => { const sx2 = sx + dx * u, top = gy - 1.5 * u, w = 1.6 * u, h = 0.9 * u; g.fillStyle = rgb([30, 50, 120], 1, fog, E.fogC); g.fillRect(sx2 - w / 2, top + h * 0.2, w, h * 0.8); }); return; }
       if (o.k === 'panel') { const w = 1.6 * u, h = 0.9 * u, top = gy - 1.5 * u; // a solar panel on a post, a little dusty
         g.fillStyle = rgb([120, 120, 130], 1, fog, E.fogC); g.fillRect(sx - u * 0.04, top + h * 0.5, Math.max(1, u * 0.08), gy - top - h * 0.5);
         g.fillStyle = rgb([30, 50, 120], 1, fog, E.fogC); g.beginPath(); g.moveTo(sx - w / 2, top + h * 0.2); g.lineTo(sx + w / 2, top + h * 0.2); g.lineTo(sx + w * 0.45, top + h); g.lineTo(sx - w * 0.45, top + h); g.fill();
@@ -227,14 +260,14 @@
         const sp = drawOutside(g, img, st.E, c, extra, t).sample;
         if (sp && t > 7600) { const k = ease(seg(t, 7600, 8500)), lift = ease(seg(t, 8500, 9100)) * 24, w = 0.36 * sp.u * 2, h = 0.36 * sp.u * 1.2;
           const tx = sp.sx, ty = sp.gy - h * 0.8 - lift, gx = W / 2 + 40 + (tx - W / 2 - 40) * k, gy = H + 20 + (ty - H - 20) * k;
-          arm(g, gx, gy, t > 8500 ? (x, y) => { g.fillStyle = '#5a4480'; g.beginPath(); g.ellipse(x, y, w / 2, h / 2, 0, 0, 6.283); g.fill(); g.fillStyle = '#8c6cc0'; g.beginPath(); g.ellipse(x - w * 0.12, y - 2, w * 0.3, h * 0.3, 0, 0, 6.283); g.fill(); } : null);
+          arm(g, gx, gy, t > 8500 ? (x, y) => { const sp = fx('sample'); if (ready(sp)) { g.imageSmoothingEnabled = false; g.drawImage(sp, x - w * 0.6, y - w * 0.6, w * 1.2, w * 1.2); return; } g.fillStyle = '#5a4480'; g.beginPath(); g.ellipse(x, y, w / 2, h / 2, 0, 0, 6.283); g.fill(); g.fillStyle = '#8c6cc0'; g.beginPath(); g.ellipse(x - w * 0.12, y - 2, w * 0.3, h * 0.3, 0, 0, 6.283); g.fill(); } : null);
           if (t > 8500) sparkle(g, gx - 10, gy - 4, t, 4); }
         airlockDoor(g, t, X.sound); return c; } },
 
     clean: { outside: true, banner: 'CLEAN PANELS! +1 ★', at: 9000,
       init: moon => { const path = s => 0.6 * Math.sin(s * 0.25); return { path, E: outsideWorld(moon, path, 2.8), END: 8.5 }; },
       draw(g, img, t, X) { const st = X.st;
-        if (t < 6700) { const c = walkCam(t, 1600, 6600, st.END, st.path, X.moon, X.still); drawOutside(g, img, st.E, c, [-2.4, 0, 2.4].map(dx => ({ x: st.path(11) + dx, y: 11, k: 'panel' })), t); airlockDoor(g, t, X.sound); return c; }
+        if (t < 6700) { const c = walkCam(t, 1600, 6600, st.END, st.path, X.moon, X.still); drawOutside(g, img, st.E, c, [{ x: st.path(11), y: 11, k: 'panels' }], t); airlockDoor(g, t, X.sound); return c; }
         // close-up: a dusty panel; your glove with a cloth wipes it row by row, then it shines
         g.fillStyle = '#1b2d6b'; g.fillRect(0, 0, W, H); for (let r = 0; r < 4; r++) for (let q = 0; q < 8; q++) { g.fillStyle = (r + q) % 2 ? '#2a46a8' : '#2f4fb8'; g.fillRect(4 + q * 23, 6 + r * 27, 21, 25); g.fillStyle = '#6f8ee8'; g.fillRect(6 + q * 23, 8 + r * 27, 6, 1); }
         const rows = [22, 60, 98], wipe = seg(t, 7000, 9000) * 3, row = Math.floor(wipe), fr = wipe - row, cx = row % 2 ? W - 12 - fr * (W - 24) : 12 + fr * (W - 24);
