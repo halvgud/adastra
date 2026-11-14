@@ -322,15 +322,17 @@
         const DG = fx(X.moon ? 'dig-moon' : 'dig-mars'), BAG = fx('assets/pixellab/mg/sandbag.png');
         if (ready(DG)) { // the PixelLab scene: pile on the left, shelter and bag wall on the right
           const soilC = X.moon ? [150, 150, 156] : [190, 100, 60], pile = X.moon ? [44, 96] : [58, 92], top = X.moon ? [161, 54] : [168, 78];
-          g.imageSmoothingEnabled = false; g.drawImage(DG, 0, 0, W, H);
+          g.imageSmoothingEnabled = false; const Z = 1.25, OX = -48, OY = 2.5, T = (x, y) => [OX + x * Z, OY + y * Z]; g.save(); g.translate(OX, OY); g.scale(Z, Z); // a closer look: the wall bigger and lower (the gloves stay their own size)
+          g.drawImage(DG, 0, 0, W, H);
           const k1 = ease(seg(t, 6800, 7600)), k2 = ease(seg(t, 7600, 8500)), sx = pile[0] + 20 + (top[0] - pile[0] - 20) * k2, sy = pile[1] - 20 + k1 * 14 - (pile[1] - top[1]) * k2 - Math.sin(k2 * 3.14) * 18, full = t > 7500 && t < 8550;
           if (t > 8600 && ready(BAG)) { const pop = 1 + 0.35 * (1 - seg(t, 8600, 8800)); g.drawImage(BAG, top[0] - 9 * pop, top[1] - 7 * pop, 18 * pop, 14 * pop); sparkle(g, top[0] + 8, top[1] - 8, t, 4); }
-          g.fillStyle = '#000'; g.fillRect(182, 30, 6, 72); g.fillStyle = '#F0E442'; g.fillRect(180, 98 - seg(t, 8600, 9000) * 8, 10, 2); // the ruler
-          arm(g, sx + 10, sy - 22, null, (gx, gy) => { g.strokeStyle = '#7a5a3a'; g.lineWidth = 3; g.lineCap = 'round'; g.beginPath(); g.moveTo(gx, gy); g.lineTo(sx - 8, sy + 6); g.stroke(); // the shovel
-            g.fillStyle = '#9aa3b5'; g.beginPath(); g.moveTo(sx - 16, sy + 3); g.lineTo(sx - 3, sy + 4); g.lineTo(sx - 6, sy + 13); g.lineTo(sx - 18, sy + 10); g.fill();
-            if (full) { g.fillStyle = rgb(soilC, 1.1, 0, soilC); g.beginPath(); g.ellipse(sx - 10, sy + 4, 7, 4, 0, 3.1416, 6.283); g.fill(); } }, 0.62);
-          leftHand(g, sx - 1, sy - 6, 0.5); // both hands on the shovel: the left one lower down the handle
+          g.fillStyle = "#000"; g.fillRect(180, 30, 6, 72); g.fillStyle = "#F0E442"; g.fillRect(178, 98 - seg(t, 8600, 9000) * 8, 10, 2); // the ruler
           if (t > 8400 && t < 9200) for (let i = 0; i < 14; i++) { const p = seg(t, 8400 + i * 20, 9000); if (p > 0 && p < 1) { g.fillStyle = rgb(soilC, 1.1, 0, soilC); g.fillRect(top[0] - 8 + (i % 5) * 4, top[1] - 26 + p * 22 + (i % 3) * 3, 2, 2); } } // soil falls on the bag
+          g.restore(); const [px, py] = T(sx, sy); // the hands and the shovel, on top of the closer view
+          arm(g, px + 10, py - 22, null, (gx, gy) => { g.strokeStyle = '#7a5a3a'; g.lineWidth = 3; g.lineCap = 'round'; g.beginPath(); g.moveTo(gx, gy); g.lineTo(px - 8, py + 6); g.stroke(); // the shovel
+            g.fillStyle = '#9aa3b5'; g.beginPath(); g.moveTo(px - 16, py + 3); g.lineTo(px - 3, py + 4); g.lineTo(px - 6, py + 13); g.lineTo(px - 18, py + 10); g.fill();
+            if (full) { g.fillStyle = rgb(soilC, 1.1, 0, soilC); g.beginPath(); g.ellipse(px - 10, py + 4, 7, 4, 0, 3.1416, 6.283); g.fill(); } }, 0.55);
+          leftHand(g, px - 1, py - 6, 0.45); // both hands on the shovel: the left one lower down the handle
           flash(g, t, 6500); helmetOverlay(g, t, X); return null; }
         const soil = X.moon ? [150, 150, 156] : [178, 98, 58]; g.fillStyle = X.moon ? '#05060c' : '#c98a60'; g.fillRect(0, 0, W, 50);
         g.fillStyle = rgb(soil, 0.9, 0, soil); g.fillRect(0, 50, W, H - 50); g.fillStyle = rgb(soil, 1.15, 0, soil); g.beginPath(); g.ellipse(46, 100, 42, 22, 0, 3.1416, 6.283); g.fill(); // the pile
