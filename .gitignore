@@ -1,0 +1,11 @@
+# Only the game goes to GitHub. Everything else (docs/, tests.html, tools/, releases/, dist/, notes) stays on this computer.
+/*
+!/.gitignore
+!/index.html
+!/js/
+!/data/
+!/assets/
+!/README.md
+!/LICENSE
+!/LICENSE-ART.md
+!/CNAME
