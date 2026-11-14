@@ -175,18 +175,18 @@
   // come in from the bottom right). (gx, gy) = the middle of the glove; holding(x, y) draws what the hand carries, behind
   // the fist. If the pictures are not loaded (yet), armCode draws a simpler arm with code.
   const ARM = { open: new Image(), grip: new Image(), ax: 42, ay: 42, s: 0.72 };
-  ARM.open.src = 'assets/pixellab/fp/arm-open.png'; ARM.grip.src = 'assets/pixellab/fp/arm-grip-r.png'; // the right fist, turned (not mirrored) so the arm comes from the bottom right with the thumb on the inside
+  ARM.open.src = 'assets/pixellab/fp/arm-open-long.png'; ARM.grip.src = 'assets/pixellab/fp/arm-grip-long.png'; // long arms (192 px: the gloves with a padded PixelLab sleeve). The right fist, turned (not mirrored) so the arm comes from the bottom right with the thumb on the inside
   // The arm pictures end at their square edge. Behind each one, the sleeve goes on in the same direction until it leaves the
   // screen, so a raised hand never shows the picture's pointed corner. Per picture: a point on the sleeve's upper edge, its
   // slope, and where its lower edge meets the picture's bottom.
-  const SLEEVE = { open: [100, 71, 1.05, 107], grip: [100, 60, 0.8, 91] };
+  const SLEEVE = { open: [150, 121, 1.15, 124], grip: [150, 99, 0.8, 161] };
   function armImg(g, im, k) { const [tx, ty, m, bx] = SLEEVE[k], L = 700; g.save(); g.translate(-ARM.ax, -ARM.ay);
-    g.fillStyle = '#e4ecef'; g.beginPath(); g.moveTo(tx, ty); g.lineTo(tx + L, ty + L * m); g.lineTo(bx + L, 128 + L * m); g.lineTo(bx, 128); g.fill();
+    g.fillStyle = '#e4ecef'; g.beginPath(); g.moveTo(tx, ty); g.lineTo(tx + L, ty + L * m); const B = im.naturalHeight || 128; g.lineTo(bx + L, B + L * m); g.lineTo(bx, B); g.fill();
     g.fillStyle = '#aab6c0'; g.beginPath(); g.moveTo(tx, ty); g.lineTo(tx + L, ty + L * m); g.lineTo(tx + L, ty + L * m + 10); g.lineTo(tx, ty + 10); g.fill(); // its shaded top side
-    const n = Math.hypot(1, m), wd = Math.abs((bx - tx) * m - (128 - ty)) / n; // the sleeve's width
+    const n = Math.hypot(1, m), wd = Math.abs((bx - tx) * m - (B - ty)) / n; // the sleeve's width
     g.strokeStyle = '#c2ccd6'; g.lineWidth = 3; for (let d = 40; d < L; d += 26) { const x0 = tx + d, y0 = ty + d * m, px = -m / n, py = 1 / n; // folds across the cloth
       g.beginPath(); g.moveTo(x0 + px * 8, y0 + py * 8); g.quadraticCurveTo(x0 + px * wd * 0.5 + 6, y0 + py * wd * 0.5 - 4, x0 + px * (wd - 4), y0 + py * (wd - 4)); g.stroke(); }
-    g.fillStyle = '#b9c3cd'; g.beginPath(); g.moveTo(bx, 128); g.lineTo(bx + L, 128 + L * m); g.lineTo(bx + L - 8 * m, 128 + L * m - 8); g.lineTo(bx - 8 * m, 128 - 8); g.fill(); // shade on the lower side
+    g.fillStyle = '#b9c3cd'; g.beginPath(); g.moveTo(bx, B); g.lineTo(bx + L, B + L * m); g.lineTo(bx + L - 8 * m, B + L * m - 8); g.lineTo(bx - 8 * m, B - 8); g.fill(); // shade on the lower side
     g.drawImage(im, 0, 0); g.restore(); }
   function arm(g, gx, gy, holding, tool, cap) {
     const grip = !!(holding || tool), im = grip ? ARM.grip : ARM.open; if (!im.complete || !im.naturalWidth) return armCode(g, gx, gy, holding, tool);
