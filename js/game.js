@@ -236,7 +236,7 @@
     ctx.globalAlpha = k < .1 ? k * 10 : k > .85 ? (1 - k) / .15 : 1; ctx.fillStyle = 'rgba(0,0,0,.78)'; ctx.fillRect(72, 18, 240, 64); ctx.fillStyle = '#F0E442'; ctx.fillRect(72, 18, 240, 3); ctx.fillRect(72, 79, 240, 3);
     text(BANNER.title, 192, 42, '#F0E442', 17); text(BANNER.line, 192, 68, '#fff', 13); ctx.globalAlpha = 1; }
   function aiMark() { // visible watermark on the scene itself, so screenshots and videos carry it (Space Apps rule for AI images)
-    ctx.font = 'bold 8px ui-monospace, Consolas, monospace'; const t = 'AI ART', w = ctx.measureText(t).width + 8;
+    ctx.font = 'bold 8px ui-monospace, Consolas, monospace'; const t = 'AI', w = ctx.measureText(t).width + 8;
     ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(CW - w - 2, CH - 15, w, 13); ctx.fillStyle = '#fff'; ctx.fillText(t, CW - w + 2, CH - 5); }
   function loop(t) { if (S) { if (view.mode === 'room') drawRoom(t, view.room, still ? 1 : Math.min(1, (t - view.t0) / 280)); else { drawBase(t); drawBanner(t); } drawFloats(t); drawFX(t); aiMark(); } requestAnimationFrame(loop); }
 
@@ -426,7 +426,7 @@
     $('coachtxt').innerHTML = r.speech; $('coachbtn').textContent = 'OK'; $('coachbtn').className = ''; $('coachmore').hidden = !r.math.length; $('coach').classList.add('show'); }
 
   // ---------- popups with Mission Control ----------
-  const mcSay = html => `<div class="mc"><span class="aiwrap"><img src="${MCIMG}" data-mc alt="${mcLabel()}"><i class="aitag">AI art</i></span><div class="bubble"><div class="mcname">${mcLabel()}</div>${html}</div><button class="read" aria-label="Read this aloud">🔊</button></div>`;
+  const mcSay = html => `<div class="mc"><span class="aiwrap"><img src="${MCIMG}" data-mc alt="${mcLabel()}"><i class="aitag">AI</i></span><div class="bubble"><div class="mcname">${mcLabel()}</div>${html}</div><button class="read" aria-label="Read this aloud">🔊</button></div>`;
   let timerId = null;
   function popup(html) { clearTimer(); hush(); $('popcard').innerHTML = html; $('pop').classList.add('show'); $('popcard').querySelectorAll('[data-close]').forEach(b => b.onclick = closeAll); bindWords($('popcard'));
     bindRead($('popcard'));
@@ -567,7 +567,7 @@
     // Any finished mission can be shared with its stars; only reaching the goal earns the patch for the collection.
     const key = S.key, code = S.code, done = end === 'done', won = done && S.stars >= S.goal, run = { key, stars: S.stars, goal: S.goal, code };
     const isNew = won ? earnPatch(run) : false; if (isNew) setTimeout(SFX.star, 900);
-    const patch = won ? `<div class="patchwin"><span class="aiwrap"><img src="${patchSrc(key)}" alt="${esc(S.M.title)} mission patch"><i class="aitag">AI art</i></span><div><b>🏅 ${isNew ? 'You earned a NEW mission patch!' : 'You earned this patch again!'}</b><small>It's saved in 🏅 My patches.</small></div></div>`
+    const patch = won ? `<div class="patchwin"><span class="aiwrap"><img src="${patchSrc(key)}" alt="${esc(S.M.title)} mission patch"><i class="aitag">AI</i></span><div><b>🏅 ${isNew ? 'You earned a NEW mission patch!' : 'You earned this patch again!'}</b><small>It's saved in 🏅 My patches.</small></div></div>`
       : end === 'done' ? `<p>🏅 Get <b>${S.goal} ⭐</b> to earn the <i>${esc(S.M.title)}</i> mission patch!</p>` : '';
     const render = () => {
       popup(`<h2>${title}</h2>${mcSay(`<p style="margin:0">${why}</p>${tryThis ? `<p>💡 ${tryThis}</p>` : ''}`)}${patch}${disc ? `<p>🏅 Discovery: <i>${disc}</i></p>` : ''}<p>⭐ ${run.stars} stars · mission code <b>#${code}</b>. A friend can play this same mission: 🗺️ → 🔢 <i>Play a mission code</i>.</p><div class="tip"></div>
@@ -614,7 +614,7 @@
     say(SITE ? `Play my mission at ${SITE.replace(/^https?:\/\//, '').replace(/\/$/, '')} · “${m.title}” · code #${run.code}` : `Play my mission: “${m.title}” · code #${run.code}`, 540, 990, 34, '#F0E442', 800);
     say('Made with real NASA data: ' + CARD_SOURCES, 540, 1030, 26, '#f4f6fb', 700);
     say('Not an official NASA product', 540, 1064, 20, '#aab4ca', 600);
-    g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(974, 90, 96, 28); say('AI ART', 1022, 110, 18, '#ffffff', 800); // visible AI watermark (Space Apps rule)
+    g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(1020, 90, 50, 28); say('AI', 1045, 110, 18, '#ffffff', 800); // visible AI watermark (Space Apps rule)
     return c;
   }
   function shareText(run) { const m = MISSIONS[run.key], url = SITE ? ` ${SITE}#${run.key}-${run.code}` : /^https?:$/.test(location.protocol) ? ` ${location.origin}${location.pathname}#${run.key}-${run.code}` : '';
@@ -653,7 +653,7 @@
   function patchBook() {
     const ks = Object.keys(MISSIONS), got = ks.filter(k => PATCHES[k]).length;
     popup(`<h2>🏅 My mission patches · ${got} of ${ks.length}</h2><p>Reach a mission’s ⭐ goal to earn its patch.</p><div class="book">${ks.map(k => { const m = MISSIONS[k], p = PATCHES[k];
-      return `<button class="${p ? 'got' : 'locked'}" data-p="${k}"><span class="aiwrap"><img src="${patchSrc(k)}" alt=""><i class="aitag">AI art</i></span><b>${m.world === 'moon' ? '🌙' : '🔴'} ${m.title}</b><small>${p ? `Best: ⭐ ${p.stars} · tap to share` : `Get ${m.goal} ⭐ · tap to play`}</small></button>`; }).join('')}</div>
+      return `<button class="${p ? 'got' : 'locked'}" data-p="${k}"><span class="aiwrap"><img src="${patchSrc(k)}" alt=""><i class="aitag">AI</i></span><b>${m.world === 'moon' ? '🌙' : '🔴'} ${m.title}</b><small>${p ? `Best: ⭐ ${p.stars} · tap to share` : `Get ${m.goal} ⭐ · tap to play`}</small></button>`; }).join('')}</div>
       <button class="big" id="pbback"><span class="e">⬅</span><span>Back to missions</span></button><span data-must></span>`);
     $('popcard').querySelectorAll('[data-p]').forEach(b => b.onclick = () => { const k = b.dataset.p; SFX.tap(); if (PATCHES[k]) sharePopup({ key: k, ...PATCHES[k] }, patchBook); else start(k); });
     $('pbback').onclick = () => { SFX.tap(); missionMenu(); };
@@ -691,7 +691,7 @@
   }
   function missionMenu() {
     popup(`<h2>🚀 Choose a mission, ${CMD()}</h2><p>Each mission teaches one real problem astronauts face.</p><div class="missions">${Object.entries(MISSIONS).map(([k, m]) =>
-      `<button class="mission" data-k="${k}"><img src="${ART}bg/${m.world}.png" alt=""><i class="aitag">AI art</i>${PATCHES[k] ? `<img class="pt" src="${patchSrc(k)}" alt="patch earned">` : ''}<div><b>${m.world === 'moon' ? '🌙' : '🔴'} ${m.title}</b><small>${m.teach}${PATCHES[k] ? ` · 🏅 best ⭐ ${PATCHES[k].stars}` : ''}</small></div></button>`).join('')}</div>
+      `<button class="mission" data-k="${k}"><img src="${ART}bg/${m.world}.png" alt=""><i class="aitag">AI</i>${PATCHES[k] ? `<img class="pt" src="${patchSrc(k)}" alt="patch earned">` : ''}<div><b>${m.world === 'moon' ? '🌙' : '🔴'} ${m.title}</b><small>${m.teach}${PATCHES[k] ? ` · 🏅 best ⭐ ${PATCHES[k].stars}` : ''}</small></div></button>`).join('')}</div>
       <button class="big" id="book"><span class="e">🏅</span><span>My mission patches<small>${Object.keys(PATCHES).filter(k => MISSIONS[k]).length} of ${Object.keys(MISSIONS).length} earned</small></span></button>
       <button class="big" id="playcode"><span class="e">🔢</span><span>Play a mission code<small>a friend's code gives the same days and the same surprises</small></span></button>
       <button class="big" id="settings"><span class="e">⚙️</span><span>Name & settings<small>${CMD()} · timers ${TIMERS ? 'on' : 'off'} · sound ${muted ? 'off' : 'on'} · music ${musicOn ? 'on' : 'off'}</small></span></button><span data-must></span>`);
