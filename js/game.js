@@ -150,7 +150,7 @@
   }
   async function loadArt() {
     const jobs = [load('bg_moon', ART + 'bg/moon.png'), load('bg_mars', ART + 'bg/mars.png'), load('panels', ART + 'props/solar-panels.png'), load('reactor', ART + 'props/reactor.png'), load('rover', ART + 'props/rover.png'), ...['soil-moon', 'soil-mars', 'tunnel', 'shaft', 'hatch'].map(n => load('base_' + n, ART + 'base/' + n + '.png')), load('south', ART + 'astronaut/Idle/rotations/south.png'), load('north', ART + 'astronaut/Idle/rotations/north.png')];
-    ROOMS.forEach(r => jobs.push(load('room_' + r.img, ART + 'rooms/' + r.img + '.png')));
+    ROOMS.forEach(r => jobs.push(load('room_' + r.img, ART + 'rooms/' + r.img + '.png'), load('cell_' + r.id, ART + 'cells/' + r.id + '.png')));
     Object.keys(MISSIONS).forEach(k => jobs.push(load('patch_' + k, patchSrc(k))));
     // Each animation is one strip of frames side by side (assets/pixellab/astronaut/strips/, made by tools/build_atlas.py)
     ['walk', 'idle', ...Object.keys(ACTS), ...['w', 'm'].flatMap(g => INDOOR.map(n => `in-${g}-${n}`))].forEach(a => jobs.push(load('strip_' + a, `${ART}astronaut/strips/${a}.png`)));
@@ -271,7 +271,8 @@
   // Where resting astronauts sleep, in the shelter picture's own coordinates (384 x 240): the lower and upper bunk,
   // then sleeping bags on the floor. bag = true for the floor spots.
   const BEDS = [[195, 167, false], [195, 109, false], [78, 214, true], [318, 214, true]];
-  function bedSpot(k) { const i = S.jobs.filter((j, kk) => j === 'rest' && kk < k).length; return BEDS[Math.min(i, BEDS.length - 1)]; }
+  const BEDS_CELL = [[80, 64, false], [80, 33, false], [32, 72, true], [100, 72, true]]; // the same, in the base's shelter cell (128 x 80)
+  function bedSpot(k, cell) { const B = cell ? BEDS_CELL : BEDS, i = S.jobs.filter((j, kk) => j === 'rest' && kk < k).length; return B[Math.min(i, B.length - 1)]; }
   function drawSleeper(t, k, x, y, s, bag) { // lying on the back, head on the right, under a blanket; breathing and z's
     const fr = spr(k, 'idle', true)[0]; if (!fr) return; const br = still ? 0 : Math.sin(t / 700 + k) * 0.8 * s;
     if (bag) { ctx.fillStyle = '#2f5d8a'; ctx.fillRect(x - 32 * s, y - 9 * s, 56 * s, 18 * s); ctx.fillStyle = '#4a86c2'; ctx.fillRect(x - 32 * s, y - 9 * s, 56 * s, 4 * s); } // sleeping bag
@@ -316,7 +317,8 @@
       if (!moon && s.clean < 0.9) { ctx.fillStyle = 'rgba(160,90,40,.55)'; ctx.fillRect(254, SKY - 58, 120, 30); } }
     if (!moon && IMG.reactor) ctx.drawImage(IMG.reactor, 182, SKY - 64);
     drawUnderground(moon);
-    ROOMS.forEach((r, i) => { const [x, y] = roomXY(i), im = IMG['room_' + r.img]; if (im) ctx.drawImage(im, x, y);
+    ROOMS.forEach((r, i) => { const [x, y] = roomXY(i), im = IMG['cell_' + r.id] || IMG['room_' + r.img]; if (im) ctx.drawImage(im, x, y); // cells: one connected building
+      if (i === 5 && IMG.cell_lab && IMG.base_shaft) { const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false; [RW + 22, 2 * RW + 22].forEach(lx => ctx.drawImage(IMG.base_shaft, lx - 7, SKY + RH - 12, 14, 24)); ctx.imageSmoothingEnabled = sm; } // ladder hatches between the two floors
       if (isOn(r) === false) smallTint(im, x, y, 'rgba(0,0,0,.6)'); // lights off: darken the room picture only
       if (r.id === 'battery') { const k = Math.max(0, s.batt) / s.cap; ctx.fillStyle = '#000'; ctx.fillRect(x + 108, y + 18, 12, 50);
         ctx.fillStyle = k < .25 ? '#D55E00' : k < .5 ? '#E69F00' : '#009E73'; const h = r0(48 * k); ctx.fillRect(x + 109, y + 19 + 48 - h, 10, h); }
@@ -342,7 +344,7 @@
       const cheer = !still && actFrame(k, 'cheer', t, indoor); // just won a puzzle, or was tapped: a happy jump
       if (cheer) { drawSprite(cheer, p.x, ry + RH - 9, p.facing, 1); if (k === 0) text('★', p.x, ry + RH - 52, '#ff9a3c', 9); return; }
       if (job === 'rest') { // asleep in a bunk (or a sleeping bag) in the shelter
-        const [ax, ay, bag] = bedSpot(k), sx = RW / 384, sy = RH / 240; p.x = rx + ax * sx; drawSleeper(t, k, rx + ax * sx, ry + ay * sy, 0.55, bag);
+        const cell = !!IMG.cell_shelter, [ax, ay, bag] = bedSpot(k, cell), sx = cell ? 1 : RW / 384, sy = cell ? 1 : RH / 240; p.x = rx + ax * sx; drawSleeper(t, k, rx + ax * sx, ry + ay * sy, cell ? 0.7 : 0.55, bag);
         if (k === 0) text('★', rx + ax * sx + 16, ry + ay * sy - 8, '#ff9a3c', 8); return; }
       const work = !moving && !still && job ? Math.abs(Math.sin(t / 180 + k)) * 1.5 : 0; // a small busy bob while working
       const busy = !moving && !still && JOBANIM[job] && actFrame(k, JOBANIM[job], t, indoor); // watering, repairing
@@ -392,7 +394,7 @@
     else { ctx.fillStyle = s.world === 'moon' ? '#0c1222' : '#1c0e08'; ctx.fillRect(0, 0, CW, CH); for (let i = 0; i < 40; i++) { ctx.fillStyle = '#2b3550'; ctx.fillRect((i * 97) % CW, (i * 53) % 36, 1, 1); }
       // around the zoomed room: the same base, 3x bigger (soil, tunnels, ladders, the neighbour rooms), a little darker
       ctx.save(); ctx.translate(-bx * 3, 40 - by * 3); ctx.scale(3, 3); const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;
-      drawUnderground(s.world === 'moon'); ROOMS.forEach((r2, i2) => { if (i2 === ri) return; const [x2, y2] = roomXY(i2), im2 = IMG['room_' + r2.img]; if (im2) ctx.drawImage(im2, x2, y2); });
+      drawUnderground(s.world === 'moon'); ROOMS.forEach((r2, i2) => { if (i2 === ri) return; const [x2, y2] = roomXY(i2), im2 = IMG['cell_' + r2.id] || IMG['room_' + r2.img]; if (im2) ctx.drawImage(im2, x2, y2); });
       ctx.imageSmoothingEnabled = sm; ctx.restore(); ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(0, 0, CW, CH); }
     if (im) ctx.drawImage(im, x, y, wd, ht);
     if (k < 1) return;
